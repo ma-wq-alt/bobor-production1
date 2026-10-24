@@ -12,6 +12,9 @@
   .btn-admin{background:#C6FF00;color:#000}
   .btn-del{background:#ff5555}
   
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+  .header-right { display: flex; gap: 8px; }
+
   .form-group { margin-bottom: 12px; }
   .form-group label { display: block; font-size: 13px; color: #8A8A93; margin-bottom: 5px; }
   input,select{width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#000;color:#fff;box-sizing:border-box;font-family:inherit;}
@@ -22,11 +25,18 @@
   .video-item a{color:#C6FF00;text-decoration:none;font-weight:bold}
   video{width:100%;border-radius:10px;margin-top:10px;background:#000}
   .player-box{margin-top:20px;display:none}
+  .save-badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:bold;background:rgba(0,200,120,.15);color:#00C878}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>🎬 BOBOR PRODUCTION</h1>
+  
+  <div class="header">
+    <h1>🎬 BOBOR PRODUCTION</h1>
+    <div class="header-right" id="header-right">
+      <!-- Сюда будут добавляться кнопки, если ты вошел -->
+    </div>
+  </div>
   
   <!-- Админ панель -->
   <div class="card" id="admin-panel" style="display:none; border-color:#C6FF00">
@@ -54,10 +64,7 @@
     </div>
     
     <button class="btn btn-admin" onclick="addVideo()">Загрузить</button>
-    <button class="btn" onclick="logout()">Выйти</button>
   </div>
-
-  <button class="btn" id="login-btn" onclick="login()">Вход для админа</button>
 
   <!-- Плеер -->
   <div class="card player-box" id="player-box">
@@ -74,9 +81,42 @@
 
 <script>
 let isAdmin = false;
-let adminPass = '';
-let allVideos = [];
+let adminPass = localStorage.getItem('bobor_cinema_pass') || '';
 
+// Проверяем, заходил ли админ ранее
+function checkAuth() {
+  if (adminPass) {
+    fetch('/api/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ password: adminPass })
+    }).then(r => {
+      if (r.ok) {
+        isAdmin = true;
+        showAdminUI();
+      } else {
+        localStorage.removeItem('bobor_cinema_pass');
+        adminPass = '';
+      }
+      loadVideos();
+    });
+  } else {
+    loadVideos();
+  }
+}
+
+// Показать кнопки управления в шапке
+function showAdminUI() {
+  document.getElementById('admin-panel').style.display = 'block';
+  const headerRight = document.getElementById('header-right');
+  headerRight.innerHTML = `
+    <span class="save-badge">● Режим админа</span>
+    <button class="btn" onclick="window.location.reload()">🔄 Обновить</button>
+    <button class="btn" onclick="logout()">Выйти</button>
+  `;
+}
+
+// Вход
 function login() {
   const p = prompt('Введите пароль админа:');
   if (!p) return;
@@ -88,8 +128,8 @@ function login() {
     if (r.ok) {
       isAdmin = true;
       adminPass = p;
-      document.getElementById('admin-panel').style.display = 'block';
-      document.getElementById('login-btn').style.display = 'none';
+      localStorage.setItem('bobor_cinema_pass', p); // СОХРАНЯЕМ ПАРОЛЬ
+      showAdminUI();
       loadVideos();
     } else {
       alert('Неверный пароль!');
@@ -97,13 +137,17 @@ function login() {
   });
 }
 
+// Выход
 function logout() {
   isAdmin = false;
+  adminPass = '';
+  localStorage.removeItem('bobor_cinema_pass'); // УДАЛЯЕМ ПАРОЛЬ
   document.getElementById('admin-panel').style.display = 'none';
-  document.getElementById('login-btn').style.display = 'block';
+  document.getElementById('header-right').innerHTML = `<button class="btn" onclick="login()">Вход для админа</button>`;
   loadVideos();
 }
 
+// Добавить видео
 function addVideo() {
   const title = document.getElementById('v-title').value;
   const season = document.getElementById('v-season').value;
@@ -126,6 +170,7 @@ function addVideo() {
   });
 }
 
+// Удалить видео
 function deleteVideo(id) {
   if(!confirm('Удалить?')) return;
   fetch('/api/videos/' + id, {
@@ -135,6 +180,7 @@ function deleteVideo(id) {
   }).then(() => loadVideos());
 }
 
+// Показать видео в плеере
 function playVideo(v) {
   document.getElementById('player-box').style.display = 'block';
   document.getElementById('player-title').innerText = `Сезон ${v.season}, Серия ${v.episode}: ${v.title}`;
@@ -143,9 +189,9 @@ function playVideo(v) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+// Загрузка списка
 function loadVideos() {
   fetch('/api/videos').then(r => r.json()).then(data => {
-    allVideos = data;
     const listDiv = document.getElementById('video-list');
     listDiv.innerHTML = '';
 
@@ -184,7 +230,12 @@ function loadVideos() {
   });
 }
 
-loadVideos();
+// Старт
+checkAuth();
+// Если не админ, показываем кнопку входа
+if(!adminPass) {
+  document.getElementById('header-right').innerHTML = `<button class="btn" onclick="login()">Вход для админа</button>`;
+}
 </script>
 </body>
 </html>
