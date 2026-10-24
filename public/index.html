@@ -11,7 +11,12 @@
   .btn{background:#FF3D00;color:#fff;border:0;padding:10px 15px;border-radius:8px;font-weight:bold;cursor:pointer;margin-right:5px}
   .btn-admin{background:#C6FF00;color:#000}
   .btn-del{background:#ff5555}
-  input,select{width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#000;color:#fff;box-sizing:border-box;margin-bottom:10px}
+  
+  .form-group { margin-bottom: 12px; }
+  .form-group label { display: block; font-size: 13px; color: #8A8A93; margin-bottom: 5px; }
+  input,select{width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#000;color:#fff;box-sizing:border-box;font-family:inherit;}
+  input:focus { outline: none; border-color: #C6FF00; }
+  
   .season-title{border-bottom:1px solid #333;padding-bottom:5px;margin-top:20px;margin-bottom:10px;color:#C6FF00;font-size:20px}
   .video-item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid #222}
   .video-item a{color:#C6FF00;text-decoration:none;font-weight:bold}
@@ -26,12 +31,28 @@
   <!-- Админ панель -->
   <div class="card" id="admin-panel" style="display:none; border-color:#C6FF00">
     <h3 style="color:#C6FF00;margin-top:0">Панель админа</h3>
-    <input type="text" id="v-title" placeholder="Название серии (например: Пилот)">
-    <div style="display:flex;gap:10px">
-      <input type="number" id="v-season" placeholder="Сезон (1)" value="1">
-      <input type="number" id="v-episode" placeholder="Серия (1)" value="1">
+    
+    <div class="form-group">
+      <label>Название серии</label>
+      <input type="text" id="v-title" placeholder="Например: Пилот">
     </div>
-    <input type="text" id="v-url" placeholder="Прямая ссылка на .mp4 файл">
+    
+    <div style="display:flex; gap:10px;">
+      <div class="form-group" style="flex:1">
+        <label>Номер сезона</label>
+        <input type="number" id="v-season" value="1" min="1">
+      </div>
+      <div class="form-group" style="flex:1">
+        <label>Номер серии</label>
+        <input type="number" id="v-episode" value="1" min="1">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Прямая ссылка на видео (mp4)</label>
+      <input type="text" id="v-url" placeholder="https://...">
+    </div>
+    
     <button class="btn btn-admin" onclick="addVideo()">Загрузить</button>
     <button class="btn" onclick="logout()">Выйти</button>
   </div>
@@ -56,7 +77,6 @@ let isAdmin = false;
 let adminPass = '';
 let allVideos = [];
 
-// Вход
 function login() {
   const p = prompt('Введите пароль админа:');
   if (!p) return;
@@ -84,12 +104,16 @@ function logout() {
   loadVideos();
 }
 
-// Добавить видео
 function addVideo() {
   const title = document.getElementById('v-title').value;
   const season = document.getElementById('v-season').value;
   const episode = document.getElementById('v-episode').value;
   const url = document.getElementById('v-url').value;
+
+  if (!title || !url) {
+    alert('Заполни название и ссылку!');
+    return;
+  }
 
   fetch('/api/videos', {
     method: 'POST',
@@ -102,7 +126,6 @@ function addVideo() {
   });
 }
 
-// Удалить видео
 function deleteVideo(id) {
   if(!confirm('Удалить?')) return;
   fetch('/api/videos/' + id, {
@@ -112,7 +135,6 @@ function deleteVideo(id) {
   }).then(() => loadVideos());
 }
 
-// Показать видео в плеере
 function playVideo(v) {
   document.getElementById('player-box').style.display = 'block';
   document.getElementById('player-title').innerText = `Сезон ${v.season}, Серия ${v.episode}: ${v.title}`;
@@ -121,7 +143,6 @@ function playVideo(v) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// Загрузка списка
 function loadVideos() {
   fetch('/api/videos').then(r => r.json()).then(data => {
     allVideos = data;
@@ -133,7 +154,6 @@ function loadVideos() {
       return;
     }
 
-    // Группировка по сезонам
     const seasons = {};
     data.forEach(v => {
       if (!seasons[v.season]) seasons[v.season] = [];
