@@ -1,1 +1,213 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BOBOR PRODUCTION</title>
+<style>
+  body{margin:0;background:#0B0B0F;color:#F5F5F7;font-family:Arial,sans-serif;font-size:15px}
+  .wrap{max-width:900px;margin:0 auto;padding:20px}
+  .card{background:#15151B;border:1px solid #26262E;border-radius:14px;padding:16px;margin-bottom:12px}
+  input{width:100%;padding:12px;border-radius:10px;border:1px solid #26262E;background:#000;color:#fff;margin-bottom:8px;box-sizing:border-box}
+  .btn{background:#C6FF00;color:#000;border:0;padding:11px 18px;border-radius:10px;font-weight:bold;cursor:pointer}
+  .btn-gray{background:rgba(255,255,255,.1);color:#fff}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+  .video-card{background:#15151B;border:1px solid #26262E;border-radius:14px;overflow:hidden;cursor:pointer}
+  .video-cover{width:100%;height:140px;object-fit:cover;background:#222}
+  .video-info{padding:12px}
+  .player-container{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:1000;flex-direction:column}
+  .player-container.active{display:flex}
+  video{width:100%;max-height:80vh;background:#000}
+  .top-bar{padding:16px;display:flex;justify-content:space-between;align-items:center}
+</style>
+</head>
+<body>
+<div class="wrap" id="main-app" style="display:none">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+    <h1 style="margin:0;color:#C6FF00">BOBOR PRODUCTION</h1>
+    <div>
+      <span id="user-name" style="margin-right:12px;color:#8A8A93"></span>
+      <button class="btn btn-gray" onclick="logout()">Выйти</button>
+    </div>
+  </div>
+  
+  <!-- Админка -->
+  <div class="card" id="admin-panel" style="display:none;border-color:#FF3D00">
+    <h3 style="color:#FF3D00;margin-top:0">Добавить видео (Админ)</h3>
+    <input type="text" id="v-title" placeholder="Название серии">
+    <input type="text" id="v-desc" placeholder="Описание">
+    <input type="text" id="v-url" placeholder="Ссылка на видео (.mp4)">
+    <input type="text" id="v-cover" placeholder="Ссылка на обложку (картинку)">
+    <button class="btn" onclick="addVideo()">Добавить</button>
+  </div>
 
+  <div class="grid" id="videos-list"></div>
+</div>
+
+<!-- Экран входа -->
+<div class="wrap" id="login-screen" style="max-width:400px;margin-top:100px">
+  <div class="card">
+    <h1 style="color:#C6FF00;margin-top:0">Вход</h1>
+    <p style="color:#8A8A93;font-size:13px">Используйте данные от банка BANK OF BOBOR</p>
+    <input type="email" id="email" placeholder="Email">
+    <input type="password" id="pwd" placeholder="Пароль">
+    <input type="password" id="secret" placeholder="Секретное слово">
+    <button class="btn" style="width:100%" onclick="login()">Войти</button>
+    <div id="login-error" style="color:#ff5555;margin-top:10px;font-size:13px"></div>
+  </div>
+</div>
+
+<!-- Плеер -->
+<div class="player-container" id="player">
+  <div class="top-bar">
+    <h2 id="player-title" style="margin:0;color:#C6FF00"></h2>
+    <button class="btn btn-gray" onclick="closePlayer()">Закрыть</button>
+  </div>
+  <video id="video-el" controls></video>
+  <div style="padding:16px;text-align:center">
+    <button class="btn" id="download-btn" onclick="downloadVideo()">Скачать для офлайна</button>
+    <p style="color:#8A8A93;font-size:12px;margin-top:8px">На iPhone добавьте сайт на экран «Домой», чтобы скачивание работало.</p>
+  </div>
+</div>
+
+<script>
+let currentUser = JSON.parse(localStorage.getItem('prod_user') || 'null');
+let currentVideoUrl = '';
+
+async function login() {
+  const email = document.getElementById('email').value;
+  const pwd = document.getElementById('pwd').value;
+  const secret = document.getElementById('secret').value;
+  
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ email, pwd, secret })
+    });
+    const data = await res.json();
+    
+    if (!res.ok) throw new Error(data.error);
+    
+    currentUser = data.user;
+    localStorage.setItem('prod_user', JSON.stringify(currentUser));
+    initApp();
+  } catch (e) {
+    document.getElementById('login-error').textContent = e.message;
+  }
+}
+
+function logout() {
+  localStorage.removeItem('prod_user');
+  currentUser = null;
+  document.getElementById('login-screen').style.display = 'block';
+  document.getElementById('main-app').style.display = 'none';
+}
+
+function initApp() {
+  if (!currentUser) {
+    document.getElementById('login-screen').style.display = 'block';
+    document.getElementById('main-app').style.display = 'none';
+    return;
+  }
+  
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+  document.getElementById('user-name').textContent = currentUser.name;
+  
+  if (currentUser.role === 'admin') {
+    document.getElementById('admin-panel').style.display = 'block';
+  }
+  
+  loadVideos();
+}
+
+async function loadVideos() {
+  const res = await fetch('/api/videos');
+  const videos = await res.json();
+  const list = document.getElementById('videos-list');
+  list.innerHTML = '';
+  
+  if (videos.length === 0) {
+    list.innerHTML = '<p style="color:#8A8A93">Пока нет серий. Админ может добавить их выше.</p>';
+    return;
+  }
+
+  videos.forEach(v => {
+    const div = document.createElement('div');
+    div.className = 'video-card';
+    div.onclick = () => openPlayer(v);
+    div.innerHTML = `
+      <img class="video-cover" src="${v.cover_url || 'https://via.placeholder.com/400x200/15151B/C6FF00?text=BOBOR'}" onerror="this.src='https://via.placeholder.com/400x200/15151B/C6FF00?text=BOBOR'">
+      <div class="video-info">
+        <h3 style="margin:0 0 4px">${v.title}</h3>
+        <p style="margin:0;color:#8A8A93;font-size:13px">${v.description || ''}</p>
+      </div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+async function addVideo() {
+  const title = document.getElementById('v-title').value;
+  const description = document.getElementById('v-desc').value;
+  const video_url = document.getElementById('v-url').value;
+  const cover_url = document.getElementById('v-cover').value;
+
+  const res = await fetch('/api/videos', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ title, description, video_url, cover_url, adminEmail: currentUser.email })
+  });
+
+  if (res.ok) {
+    document.getElementById('v-title').value = '';
+    document.getElementById('v-desc').value = '';
+    document.getElementById('v-url').value = '';
+    document.getElementById('v-cover').value = '';
+    loadVideos();
+  } else {
+    alert('Ошибка добавления');
+  }
+}
+
+function openPlayer(v) {
+  document.getElementById('player-title').textContent = v.title;
+  const video = document.getElementById('video-el');
+  video.src = v.video_url;
+  currentVideoUrl = v.video_url;
+  document.getElementById('player').classList.add('active');
+  video.play();
+}
+
+function closePlayer() {
+  const video = document.getElementById('video-el');
+  video.pause();
+  video.src = '';
+  document.getElementById('player').classList.remove('active');
+}
+
+// Скачивание
+async function downloadVideo() {
+  if (!currentVideoUrl) return;
+  try {
+    const response = await fetch(currentVideoUrl);
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = 'BOBOR_Series.mp4';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    alert('Видео скачано! (В реальном приложении оно сохраняется в память устройства)');
+  } catch (e) {
+    alert('Не удалось скачать видео');
+  }
+}
+
+initApp();
+</script>
+</body>
+</html>
