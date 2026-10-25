@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BOBOR PRODUCTION</title>
 <style>
-  /* ... стили остаются прежними ... */
+  /* ... стили ... */
   body{background:#0B0B0F;color:#fff;font-family:Arial,sans-serif;margin:0;padding:20px}
   .wrap{max-width:800px;margin:0 auto}
   .card{background:#15151B;border:1px solid #26262E;border-radius:12px;padding:20px;margin-bottom:15px}
@@ -34,21 +34,20 @@
     <h2 style="color:#FFB800; font-size:24px;" id="check-title">⏳ Проверка...</h2>
     <p style="color:#8A8A93; font-size:15px; margin-top:10px;" id="check-text">Проверяем ваш BOBOR-ID...</p>
     <button class="btn2" style="width:100%; margin-top:20px; display:none;" id="btn-goto-id" onclick="window.open('https://bobor-passport.onrender.com', '_blank')">Перейти в BOBOR-ID</button>
-    <button class="btn" style="width:100%; margin-top:10px; display:none;" id="btn-retry" onclick="location.reload()">Я подтвердил, проверить</button>
+    <button class="btn" style="width:100%; margin-top:10px; display:none;" id="btn-retry" onclick="forceCheck()">Я подтвердил, проверить</button>
   </div>
 
   <div id="main-ui" style="display:none">
-    <div class="header">
-      <h1>🎬 BOBOR PRODUCTION</h1>
-      <div class="header-right" id="header-right"></div>
-    </div>
-    <!-- ... остальной HTML для видео и админки ... -->
+    <!-- ... основной интерфейс ... -->
   </div>
 </div>
 
 <script>
 let currentUser = null;
 let adminPass = '';
+let userProgress = {}; 
+let currentVideoData = null;
+let saveInterval = null;
 
 function doLogin() {
   const email = document.getElementById('log-email').value;
@@ -57,7 +56,6 @@ function doLogin() {
   
   if (!password || !secret) return alert('Заполните пароль и секретное слово');
 
-  // Отправляем все 3 поля на сервер
   fetch('/api/login', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -71,7 +69,7 @@ function doLogin() {
       localStorage.setItem('bobor_cinema_user', JSON.stringify(currentUser));
       localStorage.setItem('bobor_email', currentUser.email); 
       
-      checkID(); // После логина проверяем паспорт
+      checkID(); 
     } else {
       const err = await r.json();
       alert(err.error || 'Ошибка входа');
@@ -79,7 +77,90 @@ function doLogin() {
   });
 }
 
-// ... остальные функции checkID, checkSavedLogin, showMainUI и т.д. - как в предыдущем коде ...
+function checkID() {
+  if (localStorage.getItem('cinema_id_approved') === 'true') {
+    let saved = localStorage.getItem('bobor_cinema_user');
+    if(saved) currentUser = JSON.parse(saved);
+    showMainUI(); 
+    return;
+  }
+
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('check-screen').style.display = 'block';
+  document.getElementById('check-title').innerText = '⏳ Проверка...';
+  document.getElementById('check-title').style.color = '#FFB800';
+  document.getElementById('check-text').innerText = 'Проверяем ваш BOBOR-ID...';
+  document.getElementById('btn-goto-id').style.display = 'none';
+  document.getElementById('btn-retry').style.display = 'none';
+
+  let emailToCheck = localStorage.getItem('bobor_cinema_user') 
+    ? JSON.parse(localStorage.getItem('bobor_cinema_user')).email 
+    : localStorage.getItem('bobor_email') || localStorage.getItem('id_email');
+
+  if (!emailToCheck) {
+    document.getElementById('check-title').innerText = '🚫 НУЖЕН BOBOR-ID';
+    document.getElementById('check-title').style.color = '#FF5555';
+    document.getElementById('check-text').innerText = 'Чтобы смотреть кино, получите BOBOR-ID.';
+    document.getElementById('btn-goto-id').style.display = 'block';
+    document.getElementById('btn-retry').style.display = 'block';
+    return;
+  }
+
+  fetch('https://bobor-passport.onrender.com/api/approval/' + emailToCheck)
+    .then(r => r.json())
+    .then(data => {
+      if (data.approved) {
+        localStorage.setItem('cinema_id_approved', 'true'); 
+        let saved = localStorage.getItem('bobor_cinema_user');
+        if(saved) currentUser = JSON.parse(saved);
+        else currentUser = { email: emailToCheck, name: 'Зритель', role: 'user' };
+        showMainUI();
+      } else {
+        document.getElementById('check-title').innerText = '⏳ ОЖИДАНИЕ';
+        document.getElementById('check-title').style.color = '#FFB800';
+        document.getElementById('check-text').innerText = 'Ваш BOBOR-ID не подтвержден. Подождите админа.';
+        document.getElementById('btn-goto-id').style.display = 'block';
+        document.getElementById('btn-retry').style.display = 'block';
+      }
+    })
+    .catch(() => {
+      showMainUI();
+    });
+}
+
+// ПРИНУДИТЕЛЬНАЯ ПРОВЕРКА
+function forceCheck() {
+  localStorage.removeItem('cinema_id_approved');
+  const emailToCheck = localStorage.getItem('bobor_cinema_user') 
+    ? JSON.parse(localStorage.getItem('bobor_cinema_user')).email 
+    : localStorage.getItem('bobor_email') || localStorage.getItem('id_email');
+    
+  if(!emailToCheck) return location.reload();
+
+  document.getElementById('check-title').innerText = '⏳ Проверка...';
+  document.getElementById('check-text').innerText = 'Проверяем ваш BOBOR-ID...';
+  document.getElementById('btn-goto-id').style.display = 'none';
+  document.getElementById('btn-retry').style.display = 'none';
+
+  fetch('https://bobor-passport.onrender.com/api/approval/' + emailToCheck)
+    .then(r => r.json())
+    .then(data => {
+      if (data.approved) {
+        localStorage.setItem('cinema_id_approved', 'true'); 
+        let saved = localStorage.getItem('bobor_cinema_user');
+        if(saved) currentUser = JSON.parse(saved);
+        else currentUser = { email: emailToCheck, name: 'Зритель', role: 'user' };
+        showMainUI();
+      } else {
+        alert('Ваш паспорт все еще не подтвержден админом.');
+        location.reload();
+      }
+    })
+    .catch(() => { showMainUI(); });
+}
+
+// ... (Остальные функции кино: checkSavedLogin, showMainUI, loadVideos и т.д. остаются как в прошлом коде)
+checkSavedLogin();
 </script>
 </body>
 </html>
