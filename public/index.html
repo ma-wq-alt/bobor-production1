@@ -35,6 +35,10 @@
   .watched-icon { color: #C6FF00; margin-left: 5px; font-weight: bold; }
   .player-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   .btn-close { background: #ff5555; padding: 5px 10px; font-size: 12px; }
+  
+  .block-screen { text-align: center; padding: 50px 20px; }
+  .block-screen h1 { color: var(--red); font-size: 28px; margin-bottom: 20px; }
+  .block-screen p { color: var(--muted); font-size: 16px; margin-bottom: 30px; }
 </style>
 </head>
 <body>
@@ -46,7 +50,14 @@
     <div class="form-group"><label>Email</label><input type="email" id="log-email" placeholder="your@email.com"></div>
     <div class="form-group"><label>Пароль</label><input type="password" id="log-pass" placeholder="Пароль (или тсб)"></div>
     <button class="btn" style="width:100%" onclick="doLogin()">Войти</button>
-    <button class="btn" style="width:100%;background:transparent;color:#8A8A93;margin-top:10px" onclick="viewAsGuest()">Зайти как гость</button>
+  </div>
+
+  <!-- ЭКРАН БЛОКИРОВКИ -->
+  <div class="card block-screen" id="view-blocked" style="display:none">
+    <h1>🚫 ДОСТУП ЗАКРЫТ</h1>
+    <p>Ваш BOBOR-ID не подтвержден. Пожалуйста, пройдите верификацию в системе BOBOR-ID, чтобы получить доступ к кинотеатру.</p>
+    <button class="btn2" style="width:100%; margin-bottom:10px" onclick="window.open('https://bobor-passport.onrender.com', '_blank')">Перейти в BOBOR-ID</button>
+    <button class="btn3" style="width:100%" onclick="location.reload()">Я подтвердил, проверить</button>
   </div>
 
   <div id="main-ui" style="display:none">
@@ -87,6 +98,14 @@ let userProgress = {};
 let currentVideoData = null;
 let saveInterval = null;
 
+// Проверка ID
+function checkUserId(email, callback) {
+  fetch('https://bobor-passport.onrender.com/api/approval/' + email)
+    .then(r => r.json())
+    .then(data => callback(data.approved))
+    .catch(() => callback(false));
+}
+
 function doLogin() {
   const email = document.getElementById('log-email').value;
   const password = document.getElementById('log-pass').value;
@@ -100,10 +119,19 @@ function doLogin() {
     if (r.ok) {
       const data = await r.json();
       currentUser = data.user;
-      if (currentUser.role === 'admin') adminPass = password;
-      localStorage.setItem('bobor_cinema_user', JSON.stringify(currentUser));
-      if (adminPass) localStorage.setItem('bobor_cinema_pass', adminPass);
-      showMainUI();
+      
+      // ПРОВЕРКА ПАСПОРТА
+      checkUserId(currentUser.email, (approved) => {
+        if (!approved) {
+          document.getElementById('login-screen').style.display = 'none';
+          document.getElementById('view-blocked').style.display = 'block';
+        } else {
+          if (currentUser.role === 'admin') adminPass = password;
+          localStorage.setItem('bobor_cinema_user', JSON.stringify(currentUser));
+          if (adminPass) localStorage.setItem('bobor_cinema_pass', adminPass);
+          showMainUI();
+        }
+      });
     } else {
       const err = await r.json();
       alert(err.error || 'Ошибка входа');
@@ -111,17 +139,20 @@ function doLogin() {
   });
 }
 
-function viewAsGuest() {
-  currentUser = { name: 'Гость', email: 'guest', role: 'guest' };
-  showMainUI();
-}
-
 function checkSavedLogin() {
   const saved = localStorage.getItem('bobor_cinema_user');
   if (saved) {
     currentUser = JSON.parse(saved);
     adminPass = localStorage.getItem('bobor_cinema_pass') || '';
-    showMainUI();
+    
+    checkUserId(currentUser.email, (approved) => {
+      if (!approved) {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('view-blocked').style.display = 'block';
+      } else {
+        showMainUI();
+      }
+    });
   } else {
     document.getElementById('login-screen').style.display = 'block';
   }
@@ -135,6 +166,7 @@ function logout() {
 
 function showMainUI() {
   document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('view-blocked').style.display = 'none';
   document.getElementById('main-ui').style.display = 'block';
   
   const right = document.getElementById('header-right');
@@ -186,46 +218,31 @@ function loadVideos() {
     
     for(const s in seasons) {
       const sDiv = document.createElement('div');
-      
       let allWatched = true;
       seasons[s].forEach(v => {
         const p = userProgress[v.id];
         const isWatched = p && p.duration > 0 && (p.progress / p.duration) > 0.9; 
         if (!isWatched) allWatched = false;
       });
-
-      sDiv.innerHTML = `
-        <div class="season-title">
-          <span>Сезон ${s}</span>
-          ${allWatched ? '<span class="season-badge">✔ Просмотрено</span>' : ''}
-        </div>
-      `;
+      sDiv.innerHTML = `<div class="season-title"><span>Сезон ${s}</span>${allWatched ? '<span class="season-badge">✔ Просмотрено</span>' : ''}</div>`;
       
       seasons[s].sort((a,b) => a.episode - b.episode).forEach(v => {
         const item = document.createElement('div'); item.className = 'video-item';
         const p = userProgress[v.id];
-        
         let percent = 0;
         let isWatched = false;
         if (p && p.duration > 0) {
            percent = Math.min((p.progress / p.duration) * 100, 100);
            if (percent > 90) isWatched = true; 
         }
-
         const leftDiv = document.createElement('div');
         leftDiv.style.flex = '1';
-        leftDiv.innerHTML = `
-          <span>Серия ${v.episode}: ${v.title}</span>
-          ${isWatched ? '<span class="watched-icon">✔</span>' : ''}
-        `;
-        
+        leftDiv.innerHTML = `<span>Серия ${v.episode}: ${v.title}</span>${isWatched ? '<span class="watched-icon">✔</span>' : ''}`;
         if (percent > 0 && !isWatched) {
-           const pb = document.createElement('div');
-           pb.className = 'progress-bar';
+           const pb = document.createElement('div'); pb.className = 'progress-bar';
            pb.innerHTML = `<div class="progress-fill" style="width:${percent}%"></div>`;
            leftDiv.appendChild(pb);
         }
-        
         item.appendChild(leftDiv);
         
         const b = document.createElement('div');
@@ -248,18 +265,13 @@ function renderResumeButton(v) {
   const container = document.getElementById('resume-container');
   container.innerHTML = '';
   const p = userProgress[v.id];
-  
   if (p && p.progress > 10) {
     const btn = document.createElement('button');
     btn.className = 'resume-btn';
     btn.innerText = `▶ Продолжить с ${formatTime(p.progress)}`;
     btn.onclick = () => {
       const videoEl = document.querySelector('#player-container video');
-      if (videoEl) {
-        videoEl.currentTime = p.progress;
-        videoEl.play();
-        container.innerHTML = ''; 
-      }
+      if (videoEl) { videoEl.currentTime = p.progress; videoEl.play(); container.innerHTML = ''; }
     };
     container.appendChild(btn);
   }
@@ -267,13 +279,7 @@ function renderResumeButton(v) {
 
 function saveProgress(video, vId) {
   if (!currentUser || currentUser.email === 'guest' || !video.duration || video.currentTime === 0) return;
-  
-  fetch('/api/progress', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ email: currentUser.email, video_id: vId, progress: video.currentTime, duration: video.duration })
-  });
-  
+  fetch('/api/progress', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email: currentUser.email, video_id: vId, progress: video.currentTime, duration: video.duration }) });
   userProgress[vId] = { progress: video.currentTime, duration: video.duration };
 }
 
@@ -282,32 +288,16 @@ function playV(v) {
   document.getElementById('player-box').style.display = 'block';
   document.getElementById('player-title').innerText = `Сезон ${v.season}, Серия ${v.episode}: ${v.title}`;
   const c = document.getElementById('player-container'); c.innerHTML = '';
-  
   const video = document.createElement('video'); 
-  video.src = v.url; 
-  video.controls = true; 
-  video.preload = 'metadata';
-  
+  video.src = v.url; video.controls = true; video.preload = 'metadata';
   video.onloadedmetadata = () => {
-    if (userProgress[v.id] && !userProgress[v.id].duration) {
-      userProgress[v.id].duration = video.duration;
-    }
+    if (userProgress[v.id] && !userProgress[v.id].duration) userProgress[v.id].duration = video.duration;
     renderResumeButton(v);
   };
-
   if (saveInterval) clearInterval(saveInterval);
-  
-  saveInterval = setInterval(() => {
-    saveProgress(video, v.id);
-  }, 5000);
-
+  saveInterval = setInterval(() => { saveProgress(video, v.id); }, 5000);
   video.onpause = () => saveProgress(video, v.id);
-  
-  video.onended = () => {
-    saveProgress(video, v.id);
-    loadVideos(); 
-  };
-
+  video.onended = () => { saveProgress(video, v.id); loadVideos(); };
   c.appendChild(video);
   document.getElementById('download-link').href = v.url;
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -316,10 +306,7 @@ function playV(v) {
 function closePlayer() {
   if (saveInterval) clearInterval(saveInterval);
   const videoEl = document.querySelector('#player-container video');
-  if (videoEl && currentVideoData) {
-    saveProgress(videoEl, currentVideoData.id);
-    videoEl.pause();
-  }
+  if (videoEl && currentVideoData) { saveProgress(videoEl, currentVideoData.id); videoEl.pause(); }
   document.getElementById('player-box').style.display = 'none';
   loadVideos(); 
 }
