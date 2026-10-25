@@ -13,17 +13,15 @@ const TURSO_TOKEN = process.env.TURSO_TOKEN;
 const db = (TURSO_URL && TURSO_TOKEN) ? createClient({ url: TURSO_URL, authToken: TURSO_TOKEN }) : null;
 
 const ADMIN_PASSWORD = 'тсб';
-const NEWS_ID = 'news_channel';
-const GENERAL_ID = 'general';
 
 async function initDB() {
-  if (!db) return console.log('⚠️ НЕТ БАЗЫ!');
+  if (!db) return console.log('⚠️ Нет базы данных для прогресса!');
   try {
     await db.batch([
       `CREATE TABLE IF NOT EXISTS cinema_videos (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, season INTEGER, episode INTEGER, url TEXT)`,
-      `CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, chat_id TEXT, from_email TEXT, from_name TEXT, text TEXT, date TEXT)`
+      `CREATE TABLE IF NOT EXISTS watch_progress (user_email TEXT, video_id INTEGER, progress REAL, updated_at TEXT, PRIMARY KEY (user_email, video_id))`
     ]);
-    console.log('✅ База готова (видео и чат)');
+    console.log('✅ База данных и прогресс готовы');
   } catch (e) { console.error('Ошибка базы:', e.message); }
 }
 
@@ -40,60 +38,65 @@ app.post('/api/login', async (req, res) => {
   try {
     const u = await db.execute({ sql: 'SELECT email, name, display_name, pwd FROM users WHERE email = ?', args: [email] });
     if (u.rows.length === 0) return res.status(401).json({ error: 'Аккаунт не найден' });
-    
     if (u.rows[0].pwd !== password) return res.status(401).json({ error: 'Неверный пароль' });
     
     const name = u.rows[0].display_name || u.rows[0].name;
     return res.json({ success: true, user: { name: name, email: u.rows[0].email, role: 'user' } });
   } catch (e) {
-    res.status(500).json({ error: 'Ошибка: ' + e.message });
+    res.status(500).json({ error: 'Ошибка базы: ' + e.message });
   }
 });
 
-// --- ПОЛУЧИТЬ ВСЕХ ПОЛЬЗОВАТЕЛЕЙ (для списка чатов) ---
-app.get('/api/users', async (req, res) => {
+// --- ВИДЕО (Теперь в базе, чтобы сохранялись) ---
+app.get('/api/videos', async (req, res) => {
   if (!db) return res.json([]);
   try {
-    const r = await db.execute('SELECT email, name, display_name FROM users');
-    const users = r.rows.map(u => ({ email: u.email, name: u.display_name || u.name }));
-    res.json(users);
+    const r = await db.execute('SELECT * FROM cinema_videos ORDER BY season, episode');
+    res.json(r.rows);
   } catch(e) { res.json([]); }
 });
 
-// --- ВИДЕО ---
-app.get('/api/videos', async (req, res) => {
-  if (!db) return res.json([]);
-  try { const r = await db.execute('SELECT * FROM cinema_videos ORDER BY season, episode'); res.json(r.rows); } catch(e) { res.json([]); }
-});
 app.post('/api/videos', async (req, res) => {
   const { password, title, season, episode, url } = req.body;
-  if (password !== ADMIN_PASSWORD || !db) return res.status(401).json({});
-  try { await db.execute({ sql: 'INSERT INTO cinema_videos (title, season, episode, url) VALUES (?, ?, ?, ?)', args: [title, season, episode, url] }); res.json({ success: true }); } catch(e){ res.status(500).json({}); }
-});
-app.delete('/api/videos/:id', async (req, res) => {
-  if (req.body.password !== ADMIN_PASSWORD || !db) return res.status(401).json({});
-  try { await db.execute({ sql: 'DELETE FROM cinema_videos WHERE id = ?', args: [req.params.id] }); res.json({ success: true }); } catch(e){ res.status(500).json({}); }
+  if (password !== ADMIN_PASSWORD || !db) return res.status(401).json({ error: 'Нет доступа' });
+  try {
+    await db.execute({ sql: 'INSERT INTO cinema_videos (title, season, episode, url) VALUES (?, ?, ?, ?)', args: [title, season, episode, url] });
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- ЧАТ ---
-app.get('/api/messages/:chat_id', async (req, res) => {
+app.delete('/api/videos/:id', async (req, res) => {
+  const { password } = req.body;
+  if (password !== ADMIN_PASSWORD || !db) return res.status(401).json({ error: 'Нет доступа' });
+  try {
+    await db.execute({ sql: 'DELETE FROM cinema_videos WHERE id = ?', args: [req.params.id] });
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// --- ПРОГРЕСС ПРОСМОТРА ---
+app.get('/api/progress/:email', async (req, res) => {
   if (!db) return res.json([]);
   try {
-    const r = await db.execute({ sql: 'SELECT * FROM messages WHERE chat_id = ? ORDER BY id', args: [req.params.chat_id] });
+    const r = await db.execute({ sql: 'SELECT * FROM watch_progress WHERE user_email = ?', args: [req.params.email] });
     res.json(r.rows);
-  } catch (e) { res.json([]); }
+  } catch(e) { res.json([]); }
 });
 
-app.post('/api/messages', async (req, res) => {
-  const { chat_id, from_email, from_name, text } = req.body;
-  if (!db) return res.status(500).json({ error: 'Нет базы' });
+app.post('/api/progress', async (req, res) => {
+  const { email, video_id, progress } = req.body;
+  if (!db || !email || email === 'guest') return res.json({ success: false });
   try {
-    await db.execute({ 
-      sql: 'INSERT INTO messages (chat_id, from_email, from_name, text, date) VALUES (?, ?, ?, ?, ?)', 
-      args: [chat_id, from_email, from_name, text, new Date().toLocaleString('ru-RU')] 
+    // Используем UPSERT (вставить или обновить) для SQLite
+    await db.execute({
+      sql: `INSERT INTO watch_progress (user_email, video_id, progress, updated_at) 
+            VALUES (?, ?, ?, ?) 
+            ON CONFLICT(user_email, video_id) DO UPDATE SET progress = ?, updated_at = ?`,
+      args: [email, video_id, progress, new Date().toISOString(), progress, new Date().toISOString()]
     });
     res.json({ success: true });
-  } catch (e) { 
+  } catch(e) { 
+    console.error(e);
     res.status(500).json({ error: e.message }); 
   }
 });
