@@ -17,33 +17,49 @@ const ADMIN_PASSWORD = 'тсб';
 async function initDB() {
   if (!db) return console.log('⚠️ НЕТ БАЗЫ!');
   try {
-    await db.batch([
-      `CREATE TABLE IF NOT EXISTS cinema_videos (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, season INTEGER, episode INTEGER, url TEXT)`,
-      `CREATE TABLE IF NOT EXISTS watch_progress (user_email TEXT, video_id INTEGER, progress REAL, duration REAL, updated_at TEXT, PRIMARY KEY (user_email, video_id))`
-    ]);
-    console.log('✅ База и прогресс готовы');
-  } catch (e) { console.error('Ошибка базы:', e.message); }
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS cinema_videos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, 
+        title TEXT, 
+        season INTEGER, 
+        episode INTEGER, 
+        url TEXT
+      )
+    `);
+    
+    // ВРЕМЕННО УДАЛЯЕМ И СОЗДАЕМ ЗАНОВО (чтобы починить баг)
+    try { await db.execute('DROP TABLE IF EXISTS watch_progress'); } catch(e) {}
+    
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS watch_progress (
+        user_email TEXT, 
+        video_id INTEGER, 
+        progress REAL, 
+        duration REAL, 
+        updated_at TEXT, 
+        PRIMARY KEY (user_email, video_id)
+      )
+    `);
+    
+    console.log('✅ База прогресса пересоздана и готова');
+  } catch (e) { 
+    console.error('❌ Ошибка базы:', e.message); 
+  }
 }
 
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
-  
   if (password === ADMIN_PASSWORD) {
     return res.json({ success: true, user: { name: 'Админ', email: 'admin@bobor.ru', role: 'admin' } });
   }
-
-  if (!db) return res.status(500).json({ error: 'Нет подключения к базе' });
-  
+  if (!db) return res.status(500).json({ error: 'Нет базы' });
   try {
     const u = await db.execute({ sql: 'SELECT email, name, display_name, pwd FROM users WHERE email = ?', args: [email] });
     if (u.rows.length === 0) return res.status(401).json({ error: 'Аккаунт не найден' });
     if (u.rows[0].pwd !== password) return res.status(401).json({ error: 'Неверный пароль' });
-    
     const name = u.rows[0].display_name || u.rows[0].name;
     return res.json({ success: true, user: { name: name, email: u.rows[0].email, role: 'user' } });
-  } catch (e) {
-    res.status(500).json({ error: 'Ошибка базы: ' + e.message });
-  }
+  } catch (e) { res.status(500).json({ error: 'Ошибка базы' }); }
 });
 
 app.get('/api/videos', async (req, res) => {
@@ -72,7 +88,7 @@ app.delete('/api/videos/:id', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// ПРОГРЕСС
+// --- ПРОГРЕСС ---
 app.get('/api/progress/:email', async (req, res) => {
   if (!db) return res.json([]);
   try {
