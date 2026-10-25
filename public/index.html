@@ -26,15 +26,15 @@
   .login-box { max-width: 400px; margin: 50px auto; }
   
   /* Стили для прогресса */
-  .progress-bar { height: 4px; background: #333; border-radius: 2px; margin-top: 5px; width: 100%; }
-  .progress-fill { height: 100%; background: #FF3D00; border-radius: 2px; width: 0%; }
-  .resume-btn { background: #C6FF00; color: #000; border: none; padding: 5px 10px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px; margin-left: 10px; }
+  .progress-bar { height: 5px; background: #333; border-radius: 3px; margin-top: 8px; width: 100%; max-width: 300px; }
+  .progress-fill { height: 100%; background: #FF3D00; border-radius: 3px; width: 0%; transition: width 0.3s; }
+  .resume-btn { background: #C6FF00; color: #000; border: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; margin-bottom: 10px; }
+  .hidden { display: none !important; }
 </style>
 </head>
 <body>
 <div class="wrap">
   
-  <!-- ЭКРАН ЛОГИНА -->
   <div class="card login-box" id="login-screen">
     <h2 style="text-align:center">🎬 BOBOR PRODUCTION</h2>
     <p style="text-align:center;color:#8A8A93">Вход через аккаунт банка</p>
@@ -44,14 +44,12 @@
     <button class="btn" style="width:100%;background:transparent;color:#8A8A93;margin-top:10px" onclick="viewAsGuest()">Зайти как гость</button>
   </div>
 
-  <!-- ОСНОВНОЙ ИНТЕРФЕЙС -->
   <div id="main-ui" style="display:none">
     <div class="header">
       <h1>🎬 BOBOR PRODUCTION</h1>
       <div class="header-right" id="header-right"></div>
     </div>
 
-    <!-- АДМИНКА -->
     <div class="card" id="admin-panel" style="display:none; border-color:#C6FF00">
       <h3 style="color:#C6FF00;margin-top:0">Панель админа</h3>
       <div class="form-group"><label>Название серии</label><input type="text" id="v-title" placeholder="Например: Пилот"></div>
@@ -63,15 +61,13 @@
       <button class="btn btn-admin" onclick="addVideo()">Загрузить</button>
     </div>
 
-    <!-- ПЛЕЕР -->
     <div class="card player-box" id="player-box">
       <h3 id="player-title" style="margin-top:0"></h3>
-      <div style="margin-bottom:10px;" id="resume-container"></div>
+      <div id="resume-container"></div>
       <div id="player-container"></div>
       <div style="margin-top:10px"><a id="download-link" href="#" download><button class="btn">⬇ Скачать видео</button></a></div>
     </div>
 
-    <!-- СПИСОК ВИДЕО -->
     <div id="video-list"></div>
   </div>
 </div>
@@ -79,21 +75,16 @@
 <script>
 let currentUser = null;
 let adminPass = '';
-let userProgress = {}; // Здесь храним прогресс: { "1": 120.5, "2": 300 }
+let userProgress = {}; 
 let currentVideoData = null;
 let saveInterval = null;
 
-// --- ЛОГИН ---
 function doLogin() {
   const email = document.getElementById('log-email').value;
   const password = document.getElementById('log-pass').value;
   if (!password) return alert('Введите пароль');
-
-  fetch('/api/login', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ email, password })
-  }).then(async r => {
+  fetch('/api/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email, password }) })
+  .then(async r => {
     if (r.ok) {
       const data = await r.json();
       currentUser = data.user;
@@ -130,26 +121,16 @@ function logout() {
   location.reload();
 }
 
-// --- ИНТЕРФЕЙС ---
 function showMainUI() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('main-ui').style.display = 'block';
-  
   const right = document.getElementById('header-right');
-  right.innerHTML = `
-    <span class="save-badge">● ${currentUser.name}</span> 
-    <button class="btn" onclick="logout()">Выйти</button>
-  `;
-  
-  if (currentUser.role === 'admin') {
-    document.getElementById('admin-panel').style.display = 'block';
-  }
-  
+  right.innerHTML = `<span class="save-badge">● ${currentUser.name}</span> <button class="btn" onclick="logout()">Выйти</button>`;
+  if (currentUser.role === 'admin') document.getElementById('admin-panel').style.display = 'block';
   loadProgress();
   loadVideos();
 }
 
-// --- ПРОГРЕСС ---
 function loadProgress() {
   if (!currentUser || currentUser.email === 'guest') return;
   fetch('/api/progress/' + currentUser.email)
@@ -157,10 +138,6 @@ function loadProgress() {
     .then(data => {
       userProgress = {};
       data.forEach(p => { userProgress[p.video_id] = p.progress; });
-      if (currentVideoData) {
-        // Обновляем кнопку, если плеер открыт
-        renderResumeButton(currentVideoData);
-      }
     });
 }
 
@@ -170,7 +147,6 @@ function formatTime(seconds) {
   return `${m}:${s < 10 ? '0' : ''}${s}`;
 }
 
-// --- ВИДЕО ---
 function addVideo() {
   const title = document.getElementById('v-title').value;
   const url = document.getElementById('v-url').value;
@@ -183,8 +159,10 @@ function loadVideos() {
   fetch('/api/videos').then(r => r.json()).then(data => {
     const list = document.getElementById('video-list'); list.innerHTML = '';
     if(!data.length) return list.innerHTML = '<div class="card">Нет видео.</div>';
+    
     const seasons = {};
     data.forEach(v => { if(!seasons[v.season]) seasons[v.season]=[]; seasons[v.season].push(v); });
+    
     for(const s in seasons) {
       const sDiv = document.createElement('div');
       sDiv.innerHTML = `<div class="season-title">Сезон ${s}</div>`;
@@ -192,24 +170,36 @@ function loadVideos() {
         const item = document.createElement('div'); item.className = 'video-item';
         const prog = userProgress[v.id] || 0;
         
-        // Вычисляем проценты для полоски
-        let percent = 0;
-        // Примерная длительность для полоски (если прогресс больше 5 минут, показываем полоску)
-        // Точную длительность мы не знаем без загрузки видео, поэтому считаем условно (до 45 минут = 100%)
+        const leftDiv = document.createElement('div');
+        leftDiv.style.flex = '1';
+        leftDiv.innerHTML = `<span>Серия ${v.episode}: ${v.title}</span>`;
+        
+        const pbContainer = document.createElement('div');
+        pbContainer.innerHTML = `<div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>`;
+        pbContainer.className = prog > 0 ? '' : 'hidden'; // Скрываем полоску, если прогресса нет
+        leftDiv.appendChild(pbContainer);
+
+        // Умный расчет длительности (через скрытое видео)
         if (prog > 0) {
-           percent = Math.min((prog / (45 * 60)) * 100, 100);
+           const tempVideo = document.createElement('video');
+           tempVideo.src = v.url;
+           tempVideo.preload = 'metadata';
+           tempVideo.onloadedmetadata = function() {
+             const duration = tempVideo.duration;
+             if (duration > 0) {
+               const percent = Math.min((prog / duration) * 100, 100);
+               pbContainer.querySelector('.progress-fill').style.width = percent + '%';
+             }
+           };
         }
 
-        item.innerHTML = `
-          <div style="flex:1">
-            <span>Серия ${v.episode}: ${v.title}</span>
-            ${prog > 0 ? `<div class="progress-bar"><div class="progress-fill" style="width:${percent}%"></div></div>` : ''}
-          </div>
-        `;
+        item.appendChild(leftDiv);
+        
         const b = document.createElement('div');
         b.innerHTML = `<button class="btn" onclick='playV(${JSON.stringify(v)})'>▶ Смотреть</button>`;
         if(currentUser.role === 'admin') b.innerHTML += ` <button class="btn btn-del" onclick="delV(${v.id})">Удалить</button>`;
-        item.appendChild(b); sDiv.appendChild(item);
+        item.appendChild(b); 
+        sDiv.appendChild(item);
       });
       list.appendChild(sDiv);
     }
@@ -226,7 +216,7 @@ function renderResumeButton(v) {
   container.innerHTML = '';
   const prog = userProgress[v.id] || 0;
   
-  if (prog > 10) { // Если посмотрел больше 10 секунд
+  if (prog > 10) {
     const btn = document.createElement('button');
     btn.className = 'resume-btn';
     btn.innerText = `▶ Продолжить с ${formatTime(prog)}`;
@@ -235,6 +225,7 @@ function renderResumeButton(v) {
       if (videoEl) {
         videoEl.currentTime = prog;
         videoEl.play();
+        container.innerHTML = ''; // Скрываем кнопку
       }
     };
     container.appendChild(btn);
@@ -251,11 +242,8 @@ function playV(v) {
   video.src = v.url; 
   video.controls = true; 
   
-  // Показываем кнопку "Продолжить", если есть прогресс
   renderResumeButton(v);
 
-  // --- СОХРАНЕНИЕ ПРОГРЕССА ---
-  // Раз в 5 секунд отправляем время на сервер
   if (saveInterval) clearInterval(saveInterval);
   saveInterval = setInterval(() => {
     if (video.currentTime > 0 && currentUser.email !== 'guest') {
@@ -264,12 +252,10 @@ function playV(v) {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ email: currentUser.email, video_id: v.id, progress: video.currentTime })
       });
-      // Обновляем локальный кэш, чтобы полоска в списке двигалась
       userProgress[v.id] = video.currentTime;
     }
-  }, 5000); // Сохраняем каждые 5 секунд просмотра
+  }, 5000);
 
-  // Останавливаем сохранение при паузе (сохраняем финальный результат)
   video.onpause = () => {
     if (video.currentTime > 0 && currentUser.email !== 'guest') {
       fetch('/api/progress', {
@@ -278,7 +264,7 @@ function playV(v) {
         body: JSON.stringify({ email: currentUser.email, video_id: v.id, progress: video.currentTime })
       });
       userProgress[v.id] = video.currentTime;
-      loadVideos(); // Обновляем полоски в списке
+      loadVideos(); // Обновляем полоски
     }
   };
 
