@@ -98,8 +98,7 @@ let userProgress = {};
 let currentVideoData = null;
 let saveInterval = null;
 
-// Проверка ID
-function checkUserId(email, callback) {
+function checkApproval(email, callback) {
   fetch('https://bobor-passport.onrender.com/api/approval/' + email)
     .then(r => r.json())
     .then(data => callback(data.approved))
@@ -120,8 +119,7 @@ function doLogin() {
       const data = await r.json();
       currentUser = data.user;
       
-      // ПРОВЕРКА ПАСПОРТА
-      checkUserId(currentUser.email, (approved) => {
+      checkApproval(currentUser.email, (approved) => {
         if (!approved) {
           document.getElementById('login-screen').style.display = 'none';
           document.getElementById('view-blocked').style.display = 'block';
@@ -145,7 +143,7 @@ function checkSavedLogin() {
     currentUser = JSON.parse(saved);
     adminPass = localStorage.getItem('bobor_cinema_pass') || '';
     
-    checkUserId(currentUser.email, (approved) => {
+    checkApproval(currentUser.email, (approved) => {
       if (!approved) {
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('view-blocked').style.display = 'block';
@@ -184,22 +182,19 @@ function showMainUI() {
   loadVideos();
 }
 
+// ... (функции loadProgress, formatTime, addVideo, loadVideos, delV, renderResumeButton, saveProgress, playV, closePlayer остались без изменений)
 function loadProgress() {
   if (!currentUser || currentUser.email === 'guest') return;
-  fetch('/api/progress/' + currentUser.email)
-    .then(r => r.json())
-    .then(data => {
+  fetch('/api/progress/' + currentUser.email).then(r => r.json()).then(data => {
       userProgress = {};
       data.forEach(p => { userProgress[p.video_id] = { progress: p.progress, duration: p.duration }; });
-    });
+  });
 }
-
 function formatTime(seconds) {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `${m}:${s < 10 ? '0' : ''}${s}`;
 }
-
 function addVideo() {
   const title = document.getElementById('v-title').value;
   const url = document.getElementById('v-url').value;
@@ -207,15 +202,12 @@ function addVideo() {
   fetch('/api/videos', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ password: adminPass, title, season: document.getElementById('v-season').value, episode: document.getElementById('v-episode').value, url }) })
   .then(() => { document.getElementById('v-title').value = ''; document.getElementById('v-url').value = ''; loadVideos(); alert('Готово!'); });
 }
-
 function loadVideos() {
   fetch('/api/videos').then(r => r.json()).then(data => {
     const list = document.getElementById('video-list'); list.innerHTML = '';
     if(!data.length) return list.innerHTML = '<div class="card">Нет видео.</div>';
-    
     const seasons = {};
     data.forEach(v => { if(!seasons[v.season]) seasons[v.season]=[]; seasons[v.season].push(v); });
-    
     for(const s in seasons) {
       const sDiv = document.createElement('div');
       let allWatched = true;
@@ -225,7 +217,6 @@ function loadVideos() {
         if (!isWatched) allWatched = false;
       });
       sDiv.innerHTML = `<div class="season-title"><span>Сезон ${s}</span>${allWatched ? '<span class="season-badge">✔ Просмотрено</span>' : ''}</div>`;
-      
       seasons[s].sort((a,b) => a.episode - b.episode).forEach(v => {
         const item = document.createElement('div'); item.className = 'video-item';
         const p = userProgress[v.id];
@@ -255,12 +246,7 @@ function loadVideos() {
     }
   });
 }
-
-function delV(id) { 
-  if(!confirm('Удалить?')) return; 
-  fetch('/api/videos/'+id, { method: 'DELETE', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ password: adminPass }) }).then(() => loadVideos()); 
-}
-
+function delV(id) { if(!confirm('Удалить?')) return; fetch('/api/videos/'+id, { method: 'DELETE', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ password: adminPass }) }).then(() => loadVideos()); }
 function renderResumeButton(v) {
   const container = document.getElementById('resume-container');
   container.innerHTML = '';
@@ -276,13 +262,11 @@ function renderResumeButton(v) {
     container.appendChild(btn);
   }
 }
-
 function saveProgress(video, vId) {
   if (!currentUser || currentUser.email === 'guest' || !video.duration || video.currentTime === 0) return;
   fetch('/api/progress', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email: currentUser.email, video_id: vId, progress: video.currentTime, duration: video.duration }) });
   userProgress[vId] = { progress: video.currentTime, duration: video.duration };
 }
-
 function playV(v) {
   currentVideoData = v;
   document.getElementById('player-box').style.display = 'block';
@@ -302,7 +286,6 @@ function playV(v) {
   document.getElementById('download-link').href = v.url;
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
-
 function closePlayer() {
   if (saveInterval) clearInterval(saveInterval);
   const videoEl = document.querySelector('#player-container video');
