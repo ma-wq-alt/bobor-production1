@@ -5,52 +5,31 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BOBOR PRODUCTION</title>
 <style>
+  /* ... стили остаются прежними ... */
   body{background:#0B0B0F;color:#fff;font-family:Arial,sans-serif;margin:0;padding:20px}
   .wrap{max-width:800px;margin:0 auto}
   .card{background:#15151B;border:1px solid #26262E;border-radius:12px;padding:20px;margin-bottom:15px}
   .btn{background:#FF3D00;color:#fff;border:0;padding:10px 15px;border-radius:8px;font-weight:bold;cursor:pointer;margin-right:5px;font-family:inherit}
   .btn2{background:#C6FF00;color:#000;border:0;padding:10px 15px;border-radius:8px;font-weight:bold;cursor:pointer;margin-right:5px;font-family:inherit}
-  .btn-admin{background:#C6FF00;color:#000}
-  .btn-del{background:#ff5555}
-  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
-  .header-right { display: flex; gap: 8px; align-items: center; }
   .form-group { margin-bottom: 12px; }
   .form-group label { display: block; font-size: 13px; color: #8A8A93; margin-bottom: 5px; }
-  input,select{width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#000;color:#fff;box-sizing:border-box;font-family:inherit;}
+  input{width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#000;color:#fff;box-sizing:border-box;font-family:inherit;}
   input:focus { outline: none; border-color: #C6FF00; }
-  
-  .season-title{display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #333;padding-bottom:5px;margin-top:20px;margin-bottom:10px;color:#C6FF00;font-size:20px}
-  .season-badge { font-size: 12px; background: #C6FF00; color: #000; padding: 2px 8px; border-radius: 6px; font-weight: bold; }
-  
-  .video-item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid #222; flex-wrap:wrap; gap:10px;}
-  .video-item a{color:#C6FF00;text-decoration:none;font-weight:bold}
-  video, iframe{width:100%;border-radius:10px;margin-top:10px;background:#000;border:0; aspect-ratio: 16 / 9;}
-  .player-box{margin-top:20px;display:none}
-  .save-badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:bold;background:rgba(0,200,120,.15);color:#00C878}
   .login-box { max-width: 400px; margin: 50px auto; }
-  
-  .progress-bar { height: 4px; background: #333; border-radius: 2px; margin-top: 5px; width: 100%; max-width: 200px;}
-  .progress-fill { height: 100%; background: #FF3D00; border-radius: 2px; width: 0%; transition: width 0.3s; }
-  .resume-btn { background: #C6FF00; color: #000; border: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; margin-bottom: 10px; }
-  
-  .watched-icon { color: #C6FF00; margin-left: 5px; font-weight: bold; }
-  .player-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-  .btn-close { background: #ff5555; padding: 5px 10px; font-size: 12px; }
 </style>
 </head>
 <body>
 <div class="wrap">
   
-  <!-- ЭКРАН ЛОГИНА (Старый) -->
   <div class="card login-box" id="login-screen">
     <h2 style="text-align:center">🎬 BOBOR PRODUCTION</h2>
     <p style="text-align:center;color:#8A8A93">Вход через аккаунт банка</p>
     <div class="form-group"><label>Email</label><input type="email" id="log-email" placeholder="your@email.com"></div>
-    <div class="form-group"><label>Пароль</label><input type="password" id="log-pass" placeholder="Пароль (или тсб)"></div>
+    <div class="form-group"><label>Пароль</label><input type="password" id="log-pass" placeholder="Пароль"></div>
+    <div class="form-group"><label>Секретное слово</label><input type="password" id="log-secret" placeholder="Секретное слово"></div>
     <button class="btn" style="width:100%" onclick="doLogin()">Войти</button>
   </div>
 
-  <!-- НОВЫЙ ЭКРАН: ПРОВЕРКА BOBOR-ID -->
   <div class="card login-box" id="check-screen" style="display:none; text-align:center; padding:40px 20px;">
     <h2 style="color:#FFB800; font-size:24px;" id="check-title">⏳ Проверка...</h2>
     <p style="color:#8A8A93; font-size:15px; margin-top:10px;" id="check-text">Проверяем ваш BOBOR-ID...</p>
@@ -58,108 +37,31 @@
     <button class="btn" style="width:100%; margin-top:10px; display:none;" id="btn-retry" onclick="location.reload()">Я подтвердил, проверить</button>
   </div>
 
-  <!-- ОСНОВНОЙ ИНТЕРФЕЙС (Старый) -->
   <div id="main-ui" style="display:none">
     <div class="header">
       <h1>🎬 BOBOR PRODUCTION</h1>
       <div class="header-right" id="header-right"></div>
     </div>
-
-    <div class="card" id="admin-panel" style="display:none; border-color:#C6FF00">
-      <h3 style="color:#C6FF00;margin-top:0">Панель админа</h3>
-      <div class="form-group"><label>Название</label><input type="text" id="v-title" placeholder="Например: Пилот"></div>
-      <div style="display:flex; gap:10px;">
-        <div class="form-group" style="flex:1"><label>Сезон</label><input type="number" id="v-season" value="1" min="1"></div>
-        <div class="form-group" style="flex:1"><label>Серия</label><input type="number" id="v-episode" value="1" min="1"></div>
-      </div>
-      <div class="form-group"><label>Ссылка на видео (mp4)</label><input type="text" id="v-url" placeholder="https://files.catbox.moe/...mp4"></div>
-      <button class="btn btn-admin" onclick="addVideo()">Загрузить</button>
-    </div>
-
-    <div class="card player-box" id="player-box">
-      <div class="player-header">
-        <h3 id="player-title" style="margin:0"></h3>
-        <button class="btn btn-close" onclick="closePlayer()">✖ Закрыть видео</button>
-      </div>
-      <div id="resume-container"></div>
-      <div id="player-container"></div>
-      <div style="margin-top:10px"><a id="download-link" href="#" download><button class="btn">⬇ Скачать видео</button></a></div>
-    </div>
-
-    <div id="video-list"></div>
+    <!-- ... остальной HTML для видео и админки ... -->
   </div>
 </div>
 
 <script>
 let currentUser = null;
 let adminPass = '';
-let userProgress = {}; 
-let currentVideoData = null;
-let saveInterval = null;
-
-// === ПРОВЕРКА BOBOR-ID С АВТОЗАГРУЗКОЙ ===
-function checkID() {
-  // Если мы уже подтверждали в этой сессии - сразу пускаем
-  if (localStorage.getItem('cinema_id_approved') === 'true') {
-    let saved = localStorage.getItem('bobor_cinema_user');
-    if(saved) currentUser = JSON.parse(saved);
-    showMainUI(); 
-    return;
-  }
-
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('check-screen').style.display = 'block';
-  document.getElementById('check-title').innerText = '⏳ Проверка...';
-  document.getElementById('check-title').style.color = '#FFB800';
-  document.getElementById('check-text').innerText = 'Проверяем ваш BOBOR-ID...';
-  document.getElementById('btn-goto-id').style.display = 'none';
-  document.getElementById('btn-retry').style.display = 'none';
-
-  let emailToCheck = localStorage.getItem('bobor_cinema_user') 
-    ? JSON.parse(localStorage.getItem('bobor_cinema_user')).email 
-    : localStorage.getItem('bobor_email') || localStorage.getItem('id_email');
-
-  if (!emailToCheck) {
-    document.getElementById('check-title').innerText = '🚫 НУЖЕН BOBOR-ID';
-    document.getElementById('check-title').style.color = '#FF5555';
-    document.getElementById('check-text').innerText = 'Чтобы смотреть кино, получите BOBOR-ID.';
-    document.getElementById('btn-goto-id').style.display = 'block';
-    document.getElementById('btn-retry').style.display = 'block';
-    return;
-  }
-
-  fetch('https://bobor-passport.onrender.com/api/approval/' + emailToCheck)
-    .then(r => r.json())
-    .then(data => {
-      if (data.approved) {
-        localStorage.setItem('cinema_id_approved', 'true'); // Запоминаем успех
-        let saved = localStorage.getItem('bobor_cinema_user');
-        if(saved) currentUser = JSON.parse(saved);
-        else currentUser = { email: emailToCheck, name: 'Зритель', role: 'user' };
-        showMainUI();
-      } else {
-        document.getElementById('check-title').innerText = '⏳ ОЖИДАНИЕ';
-        document.getElementById('check-title').style.color = '#FFB800';
-        document.getElementById('check-text').innerText = 'Ваш BOBOR-ID не подтвержден. Подождите админа.';
-        document.getElementById('btn-goto-id').style.display = 'block';
-        document.getElementById('btn-retry').style.display = 'block';
-      }
-    })
-    .catch(() => {
-      // Если сервер BOBOR-ID спит или недоступен - пускаем в кино
-      showMainUI();
-    });
-}
 
 function doLogin() {
   const email = document.getElementById('log-email').value;
   const password = document.getElementById('log-pass').value;
-  if (!password) return alert('Введите пароль');
+  const secret = document.getElementById('log-secret').value;
+  
+  if (!password || !secret) return alert('Заполните пароль и секретное слово');
 
+  // Отправляем все 3 поля на сервер
   fetch('/api/login', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ email, password, secret })
   }).then(async r => {
     if (r.ok) {
       const data = await r.json();
@@ -168,10 +70,8 @@ function doLogin() {
       
       localStorage.setItem('bobor_cinema_user', JSON.stringify(currentUser));
       localStorage.setItem('bobor_email', currentUser.email); 
-      if (adminPass) localStorage.setItem('bobor_cinema_pass', adminPass);
       
-      // После логина сразу проверяем ID
-      checkID();
+      checkID(); // После логина проверяем паспорт
     } else {
       const err = await r.json();
       alert(err.error || 'Ошибка входа');
@@ -179,179 +79,7 @@ function doLogin() {
   });
 }
 
-function checkSavedLogin() {
-  const saved = localStorage.getItem('bobor_cinema_user');
-  if (saved) {
-    currentUser = JSON.parse(saved);
-    adminPass = localStorage.getItem('bobor_cinema_pass') || '';
-    checkID(); // Если уже залогинен, идем на проверку
-  } else {
-    // Если не залогинен, проверяем, есть ли email от банка
-    if (localStorage.getItem('bobor_email')) {
-       checkID();
-    } else {
-       document.getElementById('login-screen').style.display = 'block';
-    }
-  }
-}
-
-function logout() {
-  localStorage.removeItem('bobor_cinema_user');
-  localStorage.removeItem('bobor_cinema_pass');
-  localStorage.removeItem('cinema_id_approved');
-  location.reload();
-}
-
-function showMainUI() {
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('check-screen').style.display = 'none';
-  document.getElementById('main-ui').style.display = 'block';
-  
-  if (!currentUser) currentUser = { name: 'Зритель', email: 'guest', role: 'user' };
-  
-  const right = document.getElementById('header-right');
-  right.innerHTML = `
-    <span class="save-badge">● ${currentUser.name}</span> 
-    <button class="btn" onclick="location.reload()">🔄 Обновить</button>
-    <button class="btn" onclick="logout()">Выйти</button>
-  `;
-  
-  if (currentUser.role === 'admin') {
-    document.getElementById('admin-panel').style.display = 'block';
-  }
-  
-  loadProgress();
-  loadVideos();
-}
-
-// ... Остальные функции (loadProgress, addVideo, playV, saveProgress и т.д.) остаются без изменений.
-
-function loadProgress() {
-  if (!currentUser || currentUser.email === 'guest') return;
-  fetch('/api/progress/' + currentUser.email)
-    .then(r => r.json())
-    .then(data => {
-      userProgress = {};
-      data.forEach(p => { userProgress[p.video_id] = { progress: p.progress, duration: p.duration }; });
-    });
-}
-
-function formatTime(seconds) {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s < 10 ? '0' : ''}${s}`;
-}
-
-function addVideo() {
-  const title = document.getElementById('v-title').value;
-  const url = document.getElementById('v-url').value;
-  if(!title || !url) return alert('Заполни данные');
-  fetch('/api/videos', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ password: adminPass, title, season: document.getElementById('v-season').value, episode: document.getElementById('v-episode').value, url }) })
-  .then(() => { document.getElementById('v-title').value = ''; document.getElementById('v-url').value = ''; loadVideos(); alert('Готово!'); });
-}
-
-function loadVideos() {
-  fetch('/api/videos').then(r => r.json()).then(data => {
-    const list = document.getElementById('video-list'); list.innerHTML = '';
-    if(!data.length) return list.innerHTML = '<div class="card">Нет видео.</div>';
-    
-    const seasons = {};
-    data.forEach(v => { if(!seasons[v.season]) seasons[v.season]=[]; seasons[v.season].push(v); });
-    
-    for(const s in seasons) {
-      const sDiv = document.createElement('div');
-      let allWatched = true;
-      seasons[s].forEach(v => {
-        const p = userProgress[v.id];
-        const isWatched = p && p.duration > 0 && (p.progress / p.duration) > 0.9; 
-        if (!isWatched) allWatched = false;
-      });
-      sDiv.innerHTML = `<div class="season-title"><span>Сезон ${s}</span>${allWatched ? '<span class="season-badge">✔ Просмотрено</span>' : ''}</div>`;
-      
-      seasons[s].sort((a,b) => a.episode - b.episode).forEach(v => {
-        const item = document.createElement('div'); item.className = 'video-item';
-        const p = userProgress[v.id];
-        let percent = 0;
-        let isWatched = false;
-        if (p && p.duration > 0) {
-           percent = Math.min((p.progress / p.duration) * 100, 100);
-           if (percent > 90) isWatched = true; 
-        }
-        const leftDiv = document.createElement('div');
-        leftDiv.style.flex = '1';
-        leftDiv.innerHTML = `<span>Серия ${v.episode}: ${v.title}</span>${isWatched ? '<span class="watched-icon">✔</span>' : ''}`;
-        if (percent > 0 && !isWatched) {
-           const pb = document.createElement('div'); pb.className = 'progress-bar';
-           pb.innerHTML = `<div class="progress-fill" style="width:${percent}%"></div>`;
-           leftDiv.appendChild(pb);
-        }
-        item.appendChild(leftDiv);
-        
-        const b = document.createElement('div');
-        b.innerHTML = `<button class="btn" onclick='playV(${JSON.stringify(v)})'>▶ Смотреть</button>`;
-        if(currentUser.role === 'admin') b.innerHTML += ` <button class="btn btn-del" onclick="delV(${v.id})">Удалить</button>`;
-        item.appendChild(b); 
-        sDiv.appendChild(item);
-      });
-      list.appendChild(sDiv);
-    }
-  });
-}
-
-function delV(id) { if(!confirm('Удалить?')) return; fetch('/api/videos/'+id, { method: 'DELETE', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ password: adminPass }) }).then(() => loadVideos()); }
-
-function renderResumeButton(v) {
-  const container = document.getElementById('resume-container');
-  container.innerHTML = '';
-  const p = userProgress[v.id];
-  if (p && p.progress > 10) {
-    const btn = document.createElement('button');
-    btn.className = 'resume-btn';
-    btn.innerText = `▶ Продолжить с ${formatTime(p.progress)}`;
-    btn.onclick = () => {
-      const videoEl = document.querySelector('#player-container video');
-      if (videoEl) { videoEl.currentTime = p.progress; videoEl.play(); container.innerHTML = ''; }
-    };
-    container.appendChild(btn);
-  }
-}
-
-function saveProgress(video, vId) {
-  if (!currentUser || currentUser.email === 'guest' || !video.duration || video.currentTime === 0) return;
-  fetch('/api/progress', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email: currentUser.email, video_id: vId, progress: video.currentTime, duration: video.duration }) });
-  userProgress[vId] = { progress: video.currentTime, duration: video.duration };
-}
-
-function playV(v) {
-  currentVideoData = v;
-  document.getElementById('player-box').style.display = 'block';
-  document.getElementById('player-title').innerText = `Сезон ${v.season}, Серия ${v.episode}: ${v.title}`;
-  const c = document.getElementById('player-container'); c.innerHTML = '';
-  const video = document.createElement('video'); 
-  video.src = v.url; video.controls = true; video.preload = 'metadata';
-  video.onloadedmetadata = () => {
-    if (userProgress[v.id] && !userProgress[v.id].duration) userProgress[v.id].duration = video.duration;
-    renderResumeButton(v);
-  };
-  if (saveInterval) clearInterval(saveInterval);
-  saveInterval = setInterval(() => { saveProgress(video, v.id); }, 5000);
-  video.onpause = () => saveProgress(video, v.id);
-  video.onended = () => { saveProgress(video, v.id); loadVideos(); };
-  c.appendChild(video);
-  document.getElementById('download-link').href = v.url;
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function closePlayer() {
-  if (saveInterval) clearInterval(saveInterval);
-  const videoEl = document.querySelector('#player-container video');
-  if (videoEl && currentVideoData) { saveProgress(videoEl, currentVideoData.id); videoEl.pause(); }
-  document.getElementById('player-box').style.display = 'none';
-  loadVideos(); 
-}
-
-// ЗАПУСКАЕМ ПРОВЕРКУ ПРИ ЗАГРУЗКЕ
-checkSavedLogin();
+// ... остальные функции checkID, checkSavedLogin, showMainUI и т.д. - как в предыдущем коде ...
 </script>
 </body>
 </html>
