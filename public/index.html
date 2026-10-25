@@ -28,8 +28,8 @@
   .save-badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:bold;background:rgba(0,200,120,.15);color:#00C878}
   .login-box { max-width: 400px; margin: 50px auto; }
   
-  .progress-bar { height: 5px; background: #333; border-radius: 3px; margin-top: 8px; width: 100%; max-width: 300px;}
-  .progress-fill { height: 100%; background: #FF3D00; border-radius: 3px; width: 0%; transition: width 0.3s; }
+  .progress-bar { height: 4px; background: #333; border-radius: 2px; margin-top: 5px; width: 100%; max-width: 200px;}
+  .progress-fill { height: 100%; background: #FF3D00; border-radius: 2px; width: 0%; transition: width 0.3s; }
   .resume-btn { background: #C6FF00; color: #000; border: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; margin-bottom: 10px; }
   
   .watched-icon { color: #C6FF00; margin-left: 5px; font-weight: bold; }
@@ -286,9 +286,8 @@ function playV(v) {
   const video = document.createElement('video'); 
   video.src = v.url; 
   video.controls = true; 
-  video.preload = 'metadata'; // Загружаем данные о длительности сразу
+  video.preload = 'metadata';
   
-  // Как только загрузились данные о длительности, обновляем полоску (если нужно)
   video.onloadedmetadata = () => {
     if (userProgress[v.id] && !userProgress[v.id].duration) {
       userProgress[v.id].duration = video.duration;
