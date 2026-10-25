@@ -5,7 +5,7 @@ import { createClient } from '@libsql/client';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 const TURSO_URL = process.env.TURSO_URL;
@@ -15,17 +15,16 @@ const db = (TURSO_URL && TURSO_TOKEN) ? createClient({ url: TURSO_URL, authToken
 const ADMIN_PASSWORD = 'тсб';
 
 async function initDB() {
-  if (!db) return console.log('⚠️ Нет базы данных для прогресса!');
+  if (!db) return console.log('⚠️ НЕТ БАЗЫ!');
   try {
     await db.batch([
       `CREATE TABLE IF NOT EXISTS cinema_videos (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, season INTEGER, episode INTEGER, url TEXT)`,
-      `CREATE TABLE IF NOT EXISTS watch_progress (user_email TEXT, video_id INTEGER, progress REAL, updated_at TEXT, PRIMARY KEY (user_email, video_id))`
+      `CREATE TABLE IF NOT EXISTS watch_progress (user_email TEXT, video_id INTEGER, progress REAL, duration REAL, updated_at TEXT, PRIMARY KEY (user_email, video_id))`
     ]);
-    console.log('✅ База данных и прогресс готовы');
+    console.log('✅ База и прогресс готовы');
   } catch (e) { console.error('Ошибка базы:', e.message); }
 }
 
-// --- ВХОД ---
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   
@@ -47,7 +46,6 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// --- ВИДЕО (Теперь в базе, чтобы сохранялись) ---
 app.get('/api/videos', async (req, res) => {
   if (!db) return res.json([]);
   try {
@@ -74,7 +72,7 @@ app.delete('/api/videos/:id', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- ПРОГРЕСС ПРОСМОТРА ---
+// ПРОГРЕСС
 app.get('/api/progress/:email', async (req, res) => {
   if (!db) return res.json([]);
   try {
@@ -84,19 +82,17 @@ app.get('/api/progress/:email', async (req, res) => {
 });
 
 app.post('/api/progress', async (req, res) => {
-  const { email, video_id, progress } = req.body;
+  const { email, video_id, progress, duration } = req.body;
   if (!db || !email || email === 'guest') return res.json({ success: false });
   try {
-    // Используем UPSERT (вставить или обновить) для SQLite
     await db.execute({
-      sql: `INSERT INTO watch_progress (user_email, video_id, progress, updated_at) 
-            VALUES (?, ?, ?, ?) 
-            ON CONFLICT(user_email, video_id) DO UPDATE SET progress = ?, updated_at = ?`,
-      args: [email, video_id, progress, new Date().toISOString(), progress, new Date().toISOString()]
+      sql: `INSERT INTO watch_progress (user_email, video_id, progress, duration, updated_at) 
+            VALUES (?, ?, ?, ?, ?) 
+            ON CONFLICT(user_email, video_id) DO UPDATE SET progress = ?, duration = ?, updated_at = ?`,
+      args: [email, video_id, progress, duration, new Date().toISOString(), progress, duration, new Date().toISOString()]
     });
     res.json({ success: true });
   } catch(e) { 
-    console.error(e);
     res.status(500).json({ error: e.message }); 
   }
 });
