@@ -33,6 +33,8 @@
   .resume-btn { background: #C6FF00; color: #000; border: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; margin-bottom: 10px; }
   
   .watched-icon { color: #C6FF00; margin-left: 5px; font-weight: bold; }
+  .player-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .btn-close { background: #ff5555; padding: 5px 10px; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -65,7 +67,10 @@
     </div>
 
     <div class="card player-box" id="player-box">
-      <h3 id="player-title" style="margin-top:0"></h3>
+      <div class="player-header">
+        <h3 id="player-title" style="margin:0"></h3>
+        <button class="btn btn-close" onclick="closePlayer()">✖ Закрыть видео</button>
+      </div>
       <div id="resume-container"></div>
       <div id="player-container"></div>
       <div style="margin-top:10px"><a id="download-link" href="#" download><button class="btn">⬇ Скачать видео</button></a></div>
@@ -176,18 +181,16 @@ function loadVideos() {
     const list = document.getElementById('video-list'); list.innerHTML = '';
     if(!data.length) return list.innerHTML = '<div class="card">Нет видео.</div>';
     
-    // Группировка по сезонам
     const seasons = {};
     data.forEach(v => { if(!seasons[v.season]) seasons[v.season]=[]; seasons[v.season].push(v); });
     
     for(const s in seasons) {
       const sDiv = document.createElement('div');
       
-      // Проверка: все ли серии в сезоне просмотрены?
       let allWatched = true;
       seasons[s].forEach(v => {
         const p = userProgress[v.id];
-        const isWatched = p && p.duration > 0 && (p.progress / p.duration) > 0.9; // Если просмотрено больше 90%
+        const isWatched = p && p.duration > 0 && (p.progress / p.duration) > 0.9; 
         if (!isWatched) allWatched = false;
       });
 
@@ -206,7 +209,7 @@ function loadVideos() {
         let isWatched = false;
         if (p && p.duration > 0) {
            percent = Math.min((p.progress / p.duration) * 100, 100);
-           if (percent > 90) isWatched = true; // Считаем просмотренным, если больше 90%
+           if (percent > 90) isWatched = true; 
         }
 
         const leftDiv = document.createElement('div');
@@ -255,11 +258,24 @@ function renderResumeButton(v) {
       if (videoEl) {
         videoEl.currentTime = p.progress;
         videoEl.play();
-        container.innerHTML = ''; // Скрываем после нажатия
+        container.innerHTML = ''; 
       }
     };
     container.appendChild(btn);
   }
+}
+
+// Сохраняем прогресс
+function saveProgress(video, vId) {
+  if (!currentUser || currentUser.email === 'guest' || !video.duration || video.currentTime === 0) return;
+  
+  fetch('/api/progress', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ email: currentUser.email, video_id: vId, progress: video.currentTime, duration: video.duration })
+  });
+  
+  userProgress[vId] = { progress: video.currentTime, duration: video.duration };
 }
 
 function playV(v) {
@@ -276,34 +292,32 @@ function playV(v) {
 
   if (saveInterval) clearInterval(saveInterval);
   
-  // Сохраняем прогресс каждые 5 секунд
+  // Сохраняем каждые 5 секунд
   saveInterval = setInterval(() => {
-    if (video.currentTime > 0 && currentUser.email !== 'guest' && video.duration > 0) {
-      fetch('/api/progress', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ email: currentUser.email, video_id: v.id, progress: video.currentTime, duration: video.duration })
-      });
-      userProgress[v.id] = { progress: video.currentTime, duration: video.duration };
-    }
+    saveProgress(video, v.id);
   }, 5000);
 
-  // Сохраняем при паузе
-  video.onpause = () => {
-    if (video.currentTime > 0 && currentUser.email !== 'guest' && video.duration > 0) {
-      fetch('/api/progress', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ email: currentUser.email, video_id: v.id, progress: video.currentTime, duration: video.duration })
-      });
-      userProgress[v.id] = { progress: video.currentTime, duration: video.duration };
-      loadVideos(); // Обновляем полоски и галочки
-    }
+  video.onpause = () => saveProgress(video, v.id);
+  
+  video.onended = () => {
+    saveProgress(video, v.id);
+    loadVideos(); // Обновляем галочки
   };
 
   c.appendChild(video);
   document.getElementById('download-link').href = v.url;
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function closePlayer() {
+  if (saveInterval) clearInterval(saveInterval);
+  const videoEl = document.querySelector('#player-container video');
+  if (videoEl && currentVideoData) {
+    saveProgress(videoEl, currentVideoData.id);
+    videoEl.pause();
+  }
+  document.getElementById('player-box').style.display = 'none';
+  loadVideos(); // Обновляем полоски
 }
 
 checkSavedLogin();
