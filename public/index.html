@@ -12,12 +12,15 @@
   .btn-admin{background:#C6FF00;color:#000}
   .btn-del{background:#ff5555}
   .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
-  .header-right { display: flex; gap: 10px; align-items: center; }
+  .header-right { display: flex; gap: 8px; align-items: center; }
   .form-group { margin-bottom: 12px; }
   .form-group label { display: block; font-size: 13px; color: #8A8A93; margin-bottom: 5px; }
   input,select{width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#000;color:#fff;box-sizing:border-box;font-family:inherit;}
   input:focus { outline: none; border-color: #C6FF00; }
-  .season-title{border-bottom:1px solid #333;padding-bottom:5px;margin-top:20px;margin-bottom:10px;color:#C6FF00;font-size:20px}
+  
+  .season-title{display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #333;padding-bottom:5px;margin-top:20px;margin-bottom:10px;color:#C6FF00;font-size:20px}
+  .season-badge { font-size: 12px; background: #C6FF00; color: #000; padding: 2px 8px; border-radius: 6px; font-weight: bold; }
+  
   .video-item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid #222; flex-wrap:wrap; gap:10px;}
   .video-item a{color:#C6FF00;text-decoration:none;font-weight:bold}
   video, iframe{width:100%;border-radius:10px;margin-top:10px;background:#000;border:0; aspect-ratio: 16 / 9;}
@@ -25,11 +28,11 @@
   .save-badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:bold;background:rgba(0,200,120,.15);color:#00C878}
   .login-box { max-width: 400px; margin: 50px auto; }
   
-  /* Стили для прогресса */
-  .progress-bar { height: 5px; background: #333; border-radius: 3px; margin-top: 8px; width: 100%; max-width: 300px; }
-  .progress-fill { height: 100%; background: #FF3D00; border-radius: 3px; width: 0%; transition: width 0.3s; }
+  .progress-bar { height: 4px; background: #333; border-radius: 2px; margin-top: 5px; width: 100%; max-width: 200px;}
+  .progress-fill { height: 100%; background: #FF3D00; border-radius: 2px; width: 0%; transition: width 0.3s; }
   .resume-btn { background: #C6FF00; color: #000; border: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; margin-bottom: 10px; }
-  .hidden { display: none !important; }
+  
+  .watched-icon { color: #C6FF00; margin-left: 5px; font-weight: bold; }
 </style>
 </head>
 <body>
@@ -52,7 +55,7 @@
 
     <div class="card" id="admin-panel" style="display:none; border-color:#C6FF00">
       <h3 style="color:#C6FF00;margin-top:0">Панель админа</h3>
-      <div class="form-group"><label>Название серии</label><input type="text" id="v-title" placeholder="Например: Пилот"></div>
+      <div class="form-group"><label>Название</label><input type="text" id="v-title" placeholder="Например: Пилот"></div>
       <div style="display:flex; gap:10px;">
         <div class="form-group" style="flex:1"><label>Сезон</label><input type="number" id="v-season" value="1" min="1"></div>
         <div class="form-group" style="flex:1"><label>Серия</label><input type="number" id="v-episode" value="1" min="1"></div>
@@ -83,8 +86,12 @@ function doLogin() {
   const email = document.getElementById('log-email').value;
   const password = document.getElementById('log-pass').value;
   if (!password) return alert('Введите пароль');
-  fetch('/api/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email, password }) })
-  .then(async r => {
+
+  fetch('/api/login', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ email, password })
+  }).then(async r => {
     if (r.ok) {
       const data = await r.json();
       currentUser = data.user;
@@ -124,9 +131,18 @@ function logout() {
 function showMainUI() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('main-ui').style.display = 'block';
+  
   const right = document.getElementById('header-right');
-  right.innerHTML = `<span class="save-badge">● ${currentUser.name}</span> <button class="btn" onclick="logout()">Выйти</button>`;
-  if (currentUser.role === 'admin') document.getElementById('admin-panel').style.display = 'block';
+  right.innerHTML = `
+    <span class="save-badge">● ${currentUser.name}</span> 
+    <button class="btn" onclick="location.reload()">🔄 Обновить</button>
+    <button class="btn" onclick="logout()">Выйти</button>
+  `;
+  
+  if (currentUser.role === 'admin') {
+    document.getElementById('admin-panel').style.display = 'block';
+  }
+  
   loadProgress();
   loadVideos();
 }
@@ -137,7 +153,7 @@ function loadProgress() {
     .then(r => r.json())
     .then(data => {
       userProgress = {};
-      data.forEach(p => { userProgress[p.video_id] = p.progress; });
+      data.forEach(p => { userProgress[p.video_id] = { progress: p.progress, duration: p.duration }; });
     });
 }
 
@@ -160,39 +176,53 @@ function loadVideos() {
     const list = document.getElementById('video-list'); list.innerHTML = '';
     if(!data.length) return list.innerHTML = '<div class="card">Нет видео.</div>';
     
+    // Группировка по сезонам
     const seasons = {};
     data.forEach(v => { if(!seasons[v.season]) seasons[v.season]=[]; seasons[v.season].push(v); });
     
     for(const s in seasons) {
       const sDiv = document.createElement('div');
-      sDiv.innerHTML = `<div class="season-title">Сезон ${s}</div>`;
+      
+      // Проверка: все ли серии в сезоне просмотрены?
+      let allWatched = true;
       seasons[s].forEach(v => {
-        const item = document.createElement('div'); item.className = 'video-item';
-        const prog = userProgress[v.id] || 0;
-        
-        const leftDiv = document.createElement('div');
-        leftDiv.style.flex = '1';
-        leftDiv.innerHTML = `<span>Серия ${v.episode}: ${v.title}</span>`;
-        
-        const pbContainer = document.createElement('div');
-        pbContainer.innerHTML = `<div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>`;
-        pbContainer.className = prog > 0 ? '' : 'hidden'; // Скрываем полоску, если прогресса нет
-        leftDiv.appendChild(pbContainer);
+        const p = userProgress[v.id];
+        const isWatched = p && p.duration > 0 && (p.progress / p.duration) > 0.9; // Если просмотрено больше 90%
+        if (!isWatched) allWatched = false;
+      });
 
-        // Умный расчет длительности (через скрытое видео)
-        if (prog > 0) {
-           const tempVideo = document.createElement('video');
-           tempVideo.src = v.url;
-           tempVideo.preload = 'metadata';
-           tempVideo.onloadedmetadata = function() {
-             const duration = tempVideo.duration;
-             if (duration > 0) {
-               const percent = Math.min((prog / duration) * 100, 100);
-               pbContainer.querySelector('.progress-fill').style.width = percent + '%';
-             }
-           };
+      sDiv.innerHTML = `
+        <div class="season-title">
+          <span>Сезон ${s}</span>
+          ${allWatched ? '<span class="season-badge">✔ Просмотрено</span>' : ''}
+        </div>
+      `;
+      
+      seasons[s].sort((a,b) => a.episode - b.episode).forEach(v => {
+        const item = document.createElement('div'); item.className = 'video-item';
+        const p = userProgress[v.id];
+        
+        let percent = 0;
+        let isWatched = false;
+        if (p && p.duration > 0) {
+           percent = Math.min((p.progress / p.duration) * 100, 100);
+           if (percent > 90) isWatched = true; // Считаем просмотренным, если больше 90%
         }
 
+        const leftDiv = document.createElement('div');
+        leftDiv.style.flex = '1';
+        leftDiv.innerHTML = `
+          <span>Серия ${v.episode}: ${v.title}</span>
+          ${isWatched ? '<span class="watched-icon">✔</span>' : ''}
+        `;
+        
+        if (percent > 0 && !isWatched) {
+           const pb = document.createElement('div');
+           pb.className = 'progress-bar';
+           pb.innerHTML = `<div class="progress-fill" style="width:${percent}%"></div>`;
+           leftDiv.appendChild(pb);
+        }
+        
         item.appendChild(leftDiv);
         
         const b = document.createElement('div');
@@ -214,18 +244,18 @@ function delV(id) {
 function renderResumeButton(v) {
   const container = document.getElementById('resume-container');
   container.innerHTML = '';
-  const prog = userProgress[v.id] || 0;
+  const p = userProgress[v.id];
   
-  if (prog > 10) {
+  if (p && p.progress > 10) {
     const btn = document.createElement('button');
     btn.className = 'resume-btn';
-    btn.innerText = `▶ Продолжить с ${formatTime(prog)}`;
+    btn.innerText = `▶ Продолжить с ${formatTime(p.progress)}`;
     btn.onclick = () => {
       const videoEl = document.querySelector('#player-container video');
       if (videoEl) {
-        videoEl.currentTime = prog;
+        videoEl.currentTime = p.progress;
         videoEl.play();
-        container.innerHTML = ''; // Скрываем кнопку
+        container.innerHTML = ''; // Скрываем после нажатия
       }
     };
     container.appendChild(btn);
@@ -245,26 +275,29 @@ function playV(v) {
   renderResumeButton(v);
 
   if (saveInterval) clearInterval(saveInterval);
+  
+  // Сохраняем прогресс каждые 5 секунд
   saveInterval = setInterval(() => {
-    if (video.currentTime > 0 && currentUser.email !== 'guest') {
+    if (video.currentTime > 0 && currentUser.email !== 'guest' && video.duration > 0) {
       fetch('/api/progress', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ email: currentUser.email, video_id: v.id, progress: video.currentTime })
+        body: JSON.stringify({ email: currentUser.email, video_id: v.id, progress: video.currentTime, duration: video.duration })
       });
-      userProgress[v.id] = video.currentTime;
+      userProgress[v.id] = { progress: video.currentTime, duration: video.duration };
     }
   }, 5000);
 
+  // Сохраняем при паузе
   video.onpause = () => {
-    if (video.currentTime > 0 && currentUser.email !== 'guest') {
+    if (video.currentTime > 0 && currentUser.email !== 'guest' && video.duration > 0) {
       fetch('/api/progress', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ email: currentUser.email, video_id: v.id, progress: video.currentTime })
+        body: JSON.stringify({ email: currentUser.email, video_id: v.id, progress: video.currentTime, duration: video.duration })
       });
-      userProgress[v.id] = video.currentTime;
-      loadVideos(); // Обновляем полоски
+      userProgress[v.id] = { progress: video.currentTime, duration: video.duration };
+      loadVideos(); // Обновляем полоски и галочки
     }
   };
 
