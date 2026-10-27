@@ -45,31 +45,20 @@
 <div class="wrap">
   
   <!-- ЭКРАН ПРОВЕРКИ -->
-  <div class="card check-screen" id="check-screen">
+  <div class="card check-screen" id="check-screen" style="display:none;">
     <h1 style="color:#FFB800;" id="check-title">⏳ Проверка...</h1>
     <p style="color:#8A8A93;" id="check-text">Проверяем ваш BOBOR-ID...</p>
     <button class="btn2" style="width:100%;margin-top:20px;display:none;" id="btn-goto-id" onclick="window.open('https://bobor-passport.onrender.com', '_blank')">Перейти в BOBOR-ID</button>
-    <button class="btn" style="width:100%;margin-top:10px;display:none;" id="btn-retry" onclick="location.reload()">Проверить снова</button>
+    <button class="btn" style="width:100%;margin-top:10px;display:none;" id="btn-retry" onclick="forceCheck()">Я подтвердил, проверить</button>
   </div>
 
   <!-- ЭКРАН ВХОДА -->
   <div class="card login-box" id="login-screen" style="display:none;">
     <h2 style="text-align:center">🎬 BOBOR PRODUCTION</h2>
     <p style="text-align:center;color:#8A8A93">Вход через аккаунт банка</p>
-    
-    <div class="form-group">
-      <label>Email</label>
-      <input type="email" id="log-email" placeholder="your@email.com" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-    </div>
-    <div class="form-group">
-      <label>Пароль</label>
-      <input type="password" id="log-pass" placeholder="Пароль" autocomplete="new-password">
-    </div>
-    <div class="form-group">
-      <label>Секретное слово</label>
-      <input type="password" id="log-secret" placeholder="Секретное слово" autocomplete="new-password">
-    </div>
-    
+    <div class="form-group"><label>Email</label><input type="email" id="log-email" placeholder="your@email.com"></div>
+    <div class="form-group"><label>Пароль</label><input type="password" id="log-pass" placeholder="Пароль"></div>
+    <div class="form-group"><label>Секретное слово</label><input type="password" id="log-secret" placeholder="Секретное слово"></div>
     <button class="btn" style="width:100%" onclick="doLogin()">Войти</button>
   </div>
 
@@ -80,19 +69,17 @@
       <div class="header-right" id="header-right"></div>
     </div>
 
-    <!-- АДМИН ПАНЕЛЬ -->
     <div class="card" id="admin-panel" style="display:none; border-color:#C6FF00">
       <h3 style="color:#C6FF00;margin-top:0">Панель админа</h3>
-      <div class="form-group"><label>Название</label><input type="text" id="v-title" placeholder="Например: Пилот" autocomplete="off"></div>
+      <div class="form-group"><label>Название</label><input type="text" id="v-title" placeholder="Например: Пилот"></div>
       <div style="display:flex; gap:10px;">
         <div class="form-group" style="flex:1"><label>Сезон</label><input type="number" id="v-season" value="1" min="1"></div>
         <div class="form-group" style="flex:1"><label>Серия</label><input type="number" id="v-episode" value="1" min="1"></div>
       </div>
-      <div class="form-group"><label>Ссылка на видео (mp4)</label><input type="text" id="v-url" placeholder="https://files.catbox.moe/...mp4" autocomplete="off"></div>
+      <div class="form-group"><label>Ссылка на видео (mp4)</label><input type="text" id="v-url" placeholder="https://files.catbox.moe/...mp4"></div>
       <button class="btn btn-admin" onclick="addVideo()">Загрузить</button>
     </div>
 
-    <!-- ПЛЕЕР -->
     <div class="card player-box" id="player-box">
       <div class="player-header">
         <h3 id="player-title" style="margin:0"></h3>
@@ -103,7 +90,6 @@
       <div style="margin-top:10px"><a id="download-link" href="#" download><button class="btn">⬇ Скачать видео</button></a></div>
     </div>
 
-    <!-- СПИСОК ВИДЕО -->
     <div id="video-list"></div>
   </div>
 </div>
@@ -115,17 +101,8 @@ let userProgress = {};
 let currentVideoData = null;
 let saveInterval = null;
 
-// === 1. ПРОВЕРКА ===
+// === ПРОВЕРКА BOBOR-ID ===
 function checkID() {
-  const savedUser = localStorage.getItem('bobor_cinema_user');
-  
-  if (savedUser) {
-    currentUser = JSON.parse(savedUser);
-    adminPass = localStorage.getItem('bobor_cinema_pass') || '';
-    showMainUI();
-    return;
-  }
-
   let emailToCheck = localStorage.getItem('bobor_email') || localStorage.getItem('id_email');
 
   if (!emailToCheck) {
@@ -144,13 +121,22 @@ function checkID() {
   document.getElementById('check-title').innerText = '⏳ Проверка...';
   document.getElementById('check-title').style.color = '#FFB800';
   document.getElementById('check-text').innerText = 'Проверяем ваш BOBOR-ID...';
+  document.getElementById('btn-goto-id').style.display = 'none';
+  document.getElementById('btn-retry').style.display = 'none';
 
   fetch('https://bobor-passport.onrender.com/api/approval/' + emailToCheck)
     .then(r => r.json())
     .then(data => {
       if (data.approved) {
-        document.getElementById('check-screen').style.display = 'none';
-        document.getElementById('login-screen').style.display = 'block';
+        let savedUser = localStorage.getItem('bobor_cinema_user');
+        if (savedUser) {
+          currentUser = JSON.parse(savedUser);
+          adminPass = localStorage.getItem('bobor_cinema_pass') || '';
+          showMainUI();
+        } else {
+          document.getElementById('check-screen').style.display = 'none';
+          document.getElementById('login-screen').style.display = 'block';
+        }
       } else {
         document.getElementById('check-title').innerText = '⏳ ОЖИДАНИЕ';
         document.getElementById('check-title').style.color = '#FFB800';
@@ -165,7 +151,36 @@ function checkID() {
     });
 }
 
-// === 2. ВХОД ===
+// Кнопка "Проверить" делает реальный запрос
+function forceCheck() {
+  let emailToCheck = localStorage.getItem('bobor_email') || localStorage.getItem('id_email');
+  if (!emailToCheck) return location.reload();
+
+  document.getElementById('check-title').innerText = '⏳ Проверка...';
+  document.getElementById('check-text').innerText = 'Проверяем ваш BOBOR-ID...';
+  document.getElementById('btn-goto-id').style.display = 'none';
+  document.getElementById('btn-retry').style.display = 'none';
+
+  fetch('https://bobor-passport.onrender.com/api/approval/' + emailToCheck)
+    .then(r => r.json())
+    .then(data => {
+      if (data.approved) {
+        let savedUser = localStorage.getItem('bobor_cinema_user');
+        if (savedUser) {
+          currentUser = JSON.parse(savedUser);
+          showMainUI();
+        } else {
+          document.getElementById('check-screen').style.display = 'none';
+          document.getElementById('login-screen').style.display = 'block';
+        }
+      } else {
+        alert('Ваш BOBOR-ID все еще не подтвержден админом.');
+        location.reload();
+      }
+    })
+    .catch(() => { location.reload(); });
+}
+
 function doLogin() {
   const email = document.getElementById('log-email').value;
   const password = document.getElementById('log-pass').value;
@@ -183,6 +198,7 @@ function doLogin() {
       if (currentUser.role === 'admin') adminPass = password;
       
       localStorage.setItem('bobor_cinema_user', JSON.stringify(currentUser));
+      localStorage.setItem('bobor_email', currentUser.email); 
       if (adminPass) localStorage.setItem('bobor_cinema_pass', adminPass);
       
       showMainUI(); 
@@ -193,7 +209,6 @@ function doLogin() {
   });
 }
 
-// === 3. ВЫХОД (ОЧИЩАЕТ ТОЛЬКО СЕССИЮ) ===
 function logout() {
   localStorage.removeItem('bobor_cinema_user');
   localStorage.removeItem('bobor_cinema_pass');
@@ -222,7 +237,6 @@ function showMainUI() {
   loadVideos();
 }
 
-// === 4. ВИДЕО ===
 function loadProgress() {
   if (!currentUser || currentUser.email === 'guest') return;
   fetch('/api/progress/' + currentUser.email)
@@ -347,7 +361,6 @@ function closePlayer() {
   loadVideos(); 
 }
 
-// СТАРТ
 checkID();
 </script>
 </body>
