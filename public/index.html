@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BOBOR PRODUCTION</title>
 <style>
-  /* Все твои стили */
   body{background:#0B0B0F;color:#fff;font-family:Arial,sans-serif;margin:0;padding:20px}
   .wrap{max-width:800px;margin:0 auto}
   .card{background:#15151B;border:1px solid #26262E;border-radius:12px;padding:20px;margin-bottom:15px}
@@ -45,13 +44,15 @@
 <body>
 <div class="wrap">
   
-  <div class="card check-screen" id="check-screen">
+  <!-- ЭКРАН ПРОВЕРКИ BOBOR-ID -->
+  <div class="card check-screen" id="check-screen" style="display:none;">
     <h1 style="color:#FFB800;" id="check-title">⏳ Проверка...</h1>
     <p style="color:#8A8A93;" id="check-text">Проверяем ваш BOBOR-ID...</p>
     <button class="btn2" style="width:100%;margin-top:20px;display:none;" id="btn-goto-id" onclick="window.open('https://bobor-passport.onrender.com', '_blank')">Перейти в BOBOR-ID</button>
     <button class="btn" style="width:100%;margin-top:10px;display:none;" id="btn-retry" onclick="location.reload()">Проверить снова</button>
   </div>
 
+  <!-- ЭКРАН ВХОДА -->
   <div class="card login-box" id="login-screen" style="display:none;">
     <h2 style="text-align:center">🎬 BOBOR PRODUCTION</h2>
     <p style="text-align:center;color:#8A8A93">Вход через аккаунт банка</p>
@@ -61,12 +62,14 @@
     <button class="btn" style="width:100%" onclick="doLogin()">Войти</button>
   </div>
 
+  <!-- ОСНОВНОЙ ИНТЕРФЕЙС -->
   <div id="main-ui" style="display:none">
     <div class="header">
       <h1>🎬 BOBOR PRODUCTION</h1>
       <div class="header-right" id="header-right"></div>
     </div>
 
+    <!-- АДМИН ПАНЕЛЬ (ВОТ ОНА) -->
     <div class="card" id="admin-panel" style="display:none; border-color:#C6FF00">
       <h3 style="color:#C6FF00;margin-top:0">Панель админа</h3>
       <div class="form-group"><label>Название</label><input type="text" id="v-title" placeholder="Например: Пилот"></div>
@@ -78,6 +81,7 @@
       <button class="btn btn-admin" onclick="addVideo()">Загрузить</button>
     </div>
 
+    <!-- ПЛЕЕР -->
     <div class="card player-box" id="player-box">
       <div class="player-header">
         <h3 id="player-title" style="margin:0"></h3>
@@ -88,6 +92,7 @@
       <div style="margin-top:10px"><a id="download-link" href="#" download><button class="btn">⬇ Скачать видео</button></a></div>
     </div>
 
+    <!-- СПИСОК ВИДЕО -->
     <div id="video-list"></div>
   </div>
 </div>
@@ -99,58 +104,62 @@ let userProgress = {};
 let currentVideoData = null;
 let saveInterval = null;
 
-// === ИСПРАВЛЕННАЯ ПРОВЕРКА (используем sessionStorage) ===
+// === 1. ПРОВЕРКА BOBOR-ID (С АВТОЗАГРУЗКОЙ) ===
 function checkID() {
-  // sessionStorage живет, пока открыта вкладка (даже при F5)
-  let savedEmail = sessionStorage.getItem('bobor_email') || localStorage.getItem('bobor_email');
-  
-  // Если паспорт уже проверен в этой сессии - просто показываем экран ВХОДА (не регистрации)
-  if (sessionStorage.getItem('cinema_approved') === 'true') {
+  // Используем localStorage, чтобы при перезагрузке не выкидывало
+  const savedEmail = localStorage.getItem('bobor_email') || localStorage.getItem('id_email');
+  const isApproved = localStorage.getItem('cinema_approved') === 'true';
+
+  // Если паспорт уже подтвержден - сразу показываем вход (или сразу кино, если залогинен)
+  if (isApproved) {
     document.getElementById('check-screen').style.display = 'none';
-    document.getElementById('login-screen').style.display = 'block';
     
-    // Если есть сохраненный юзер, но мы ввели "Выйти", просто покажем логин
-    let saved = sessionStorage.getItem('bobor_cinema_user') || localStorage.getItem('bobor_cinema_user');
-    if(saved) { 
-      currentUser = JSON.parse(saved); 
-      showMainUI(); 
+    let saved = localStorage.getItem('bobor_cinema_user');
+    if (saved) {
+      currentUser = JSON.parse(saved);
+      if (currentUser.role === 'admin') adminPass = localStorage.getItem('bobor_cinema_pass') || '';
+      showMainUI();
+    } else {
+      document.getElementById('login-screen').style.display = 'block';
     }
     return;
   }
 
-  // Если email нет вообще - показываем регистрацию (или окно BOBOR-ID)
-  if (!savedEmail) {
-    document.getElementById('check-title').innerText = '🪪 ВХОД ЧЕРЕЗ BOBOR-ID';
-    document.getElementById('check-title').style.color = '#C6FF00';
-    document.getElementById('check-text').innerText = 'Для входа получите BOBOR-ID.';
-    document.getElementById('btn-goto-id').style.display = 'block';
-    document.getElementById('btn-retry').style.display = 'block';
+  // Если паспорт не подтвержден, но есть email - проверяем
+  if (savedEmail) {
+    document.getElementById('check-screen').style.display = 'block';
+    document.getElementById('login-screen').style.display = 'none';
+    
+    fetch('https://bobor-passport.onrender.com/api/approval/' + savedEmail)
+      .then(r => r.json())
+      .then(data => {
+        if (data.approved) {
+          localStorage.setItem('cinema_approved', 'true');
+          document.getElementById('check-screen').style.display = 'none';
+          document.getElementById('login-screen').style.display = 'block';
+        } else {
+          document.getElementById('check-title').innerText = '⏳ ОЖИДАНИЕ';
+          document.getElementById('check-title').style.color = '#FFB800';
+          document.getElementById('check-text').innerText = 'Ваш BOBOR-ID не подтвержден.';
+          document.getElementById('btn-goto-id').style.display = 'block';
+          document.getElementById('btn-retry').style.display = 'block';
+        }
+      })
+      .catch(() => {
+        document.getElementById('check-screen').style.display = 'none';
+        document.getElementById('login-screen').style.display = 'block';
+      });
     return;
   }
 
-  // Проверяем паспорт
+  // Если нет ни паспорта, ни email - показываем окно BOBOR-ID
   document.getElementById('check-screen').style.display = 'block';
   document.getElementById('login-screen').style.display = 'none';
-  
-  fetch('https://bobor-passport.onrender.com/api/approval/' + savedEmail)
-    .then(r => r.json())
-    .then(data => {
-      if (data.approved) {
-        sessionStorage.setItem('cinema_approved', 'true');
-        document.getElementById('check-screen').style.display = 'none';
-        document.getElementById('login-screen').style.display = 'block';
-      } else {
-        document.getElementById('check-title').innerText = '⏳ ОЖИДАНИЕ';
-        document.getElementById('check-title').style.color = '#FFB800';
-        document.getElementById('check-text').innerText = 'Ваш BOBOR-ID не подтвержден.';
-        document.getElementById('btn-goto-id').style.display = 'block';
-        document.getElementById('btn-retry').style.display = 'block';
-      }
-    })
-    .catch(() => {
-      document.getElementById('check-screen').style.display = 'none';
-      document.getElementById('login-screen').style.display = 'block';
-    });
+  document.getElementById('check-title').innerText = '🪪 НУЖЕН BOBOR-ID';
+  document.getElementById('check-title').style.color = '#C6FF00';
+  document.getElementById('check-text').innerText = 'Для входа получите BOBOR-ID.';
+  document.getElementById('btn-goto-id').style.display = 'block';
+  document.getElementById('btn-retry').style.display = 'block';
 }
 
 function doLogin() {
@@ -169,10 +178,9 @@ function doLogin() {
       currentUser = data.user;
       if (currentUser.role === 'admin') adminPass = password;
       
-      // Сохраняем в sessionStorage (не удалится при F5)
-      sessionStorage.setItem('bobor_cinema_user', JSON.stringify(currentUser));
-      sessionStorage.setItem('bobor_email', currentUser.email); 
-      if (adminPass) sessionStorage.setItem('bobor_cinema_pass', adminPass);
+      localStorage.setItem('bobor_cinema_user', JSON.stringify(currentUser));
+      localStorage.setItem('bobor_email', currentUser.email); 
+      if (adminPass) localStorage.setItem('bobor_cinema_pass', adminPass);
       
       showMainUI(); 
     } else {
@@ -182,13 +190,11 @@ function doLogin() {
   });
 }
 
-// === ВЫХОД (УДАЛЯЕМ ТОЛЬКО СЕССИЮ КИНО) ===
+// === 2. ВЫХОД (НЕ УДАЛЯЕТ ПАСПОРТ) ===
 function logout() {
-  // Удаляем только данные кино из sessionStorage
-  sessionStorage.removeItem('bobor_cinema_user');
-  sessionStorage.removeItem('bobor_cinema_pass');
-  // НЕ удаляем bobor_email и cinema_approved
-  // Но чтобы при F5 не выкидывало, мы перезагружаем страницу, и она снова покажет экран входа
+  localStorage.removeItem('bobor_cinema_user');
+  localStorage.removeItem('bobor_cinema_pass');
+  // НЕ удаляем bobor_email и cinema_approved, чтобы не выкидывало при F5
   location.reload(); 
 }
 
@@ -206,6 +212,7 @@ function showMainUI() {
     <button class="btn" onclick="logout()">Выйти</button>
   `;
   
+  // ПРОВЕРКА НА АДМИНА (ПОКАЗЫВАЕМ ПАНЕЛЬ)
   if (currentUser.role === 'admin') {
     document.getElementById('admin-panel').style.display = 'block';
   }
@@ -214,7 +221,7 @@ function showMainUI() {
   loadVideos();
 }
 
-// === ФУНКЦИИ ВИДЕО ===
+// === 3. ФУНКЦИИ ВИДЕО ===
 function loadProgress() {
   if (!currentUser || currentUser.email === 'guest') return;
   fetch('/api/progress/' + currentUser.email)
