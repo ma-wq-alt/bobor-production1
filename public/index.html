@@ -44,7 +44,7 @@
 <body>
 <div class="wrap">
   
-  <!-- ЭКРАН ПРОВЕРКИ BOBOR-ID -->
+  <!-- ЭКРАН ПРОВЕРКИ -->
   <div class="card check-screen" id="check-screen">
     <h1 style="color:#FFB800;" id="check-title">⏳ Проверка...</h1>
     <p style="color:#8A8A93;" id="check-text">Проверяем ваш BOBOR-ID...</p>
@@ -56,9 +56,20 @@
   <div class="card login-box" id="login-screen" style="display:none;">
     <h2 style="text-align:center">🎬 BOBOR PRODUCTION</h2>
     <p style="text-align:center;color:#8A8A93">Вход через аккаунт банка</p>
-    <div class="form-group"><label>Email</label><input type="email" id="log-email" placeholder="your@email.com"></div>
-    <div class="form-group"><label>Пароль</label><input type="password" id="log-pass" placeholder="Пароль"></div>
-    <div class="form-group"><label>Секретное слово</label><input type="password" id="log-secret" placeholder="Секретное слово"></div>
+    
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="log-email" placeholder="your@email.com" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    </div>
+    <div class="form-group">
+      <label>Пароль</label>
+      <input type="password" id="log-pass" placeholder="Пароль" autocomplete="new-password">
+    </div>
+    <div class="form-group">
+      <label>Секретное слово</label>
+      <input type="password" id="log-secret" placeholder="Секретное слово" autocomplete="new-password">
+    </div>
+    
     <button class="btn" style="width:100%" onclick="doLogin()">Войти</button>
   </div>
 
@@ -72,12 +83,12 @@
     <!-- АДМИН ПАНЕЛЬ -->
     <div class="card" id="admin-panel" style="display:none; border-color:#C6FF00">
       <h3 style="color:#C6FF00;margin-top:0">Панель админа</h3>
-      <div class="form-group"><label>Название</label><input type="text" id="v-title" placeholder="Например: Пилот"></div>
+      <div class="form-group"><label>Название</label><input type="text" id="v-title" placeholder="Например: Пилот" autocomplete="off"></div>
       <div style="display:flex; gap:10px;">
         <div class="form-group" style="flex:1"><label>Сезон</label><input type="number" id="v-season" value="1" min="1"></div>
         <div class="form-group" style="flex:1"><label>Серия</label><input type="number" id="v-episode" value="1" min="1"></div>
       </div>
-      <div class="form-group"><label>Ссылка на видео (mp4)</label><input type="text" id="v-url" placeholder="https://files.catbox.moe/...mp4"></div>
+      <div class="form-group"><label>Ссылка на видео (mp4)</label><input type="text" id="v-url" placeholder="https://files.catbox.moe/...mp4" autocomplete="off"></div>
       <button class="btn btn-admin" onclick="addVideo()">Загрузить</button>
     </div>
 
@@ -104,23 +115,19 @@ let userProgress = {};
 let currentVideoData = null;
 let saveInterval = null;
 
-// === 1. ПРОВЕРКА BOBOR-ID ПРИ ЗАГРУЗКЕ ===
+// === 1. ПРОВЕРКА ===
 function checkID() {
-  // Проверяем, сохранен ли вход в кино
   const savedUser = localStorage.getItem('bobor_cinema_user');
   
   if (savedUser) {
-    // Если сохранен - сразу пускаем в кино (автозагрузка)
     currentUser = JSON.parse(savedUser);
     adminPass = localStorage.getItem('bobor_cinema_pass') || '';
     showMainUI();
     return;
   }
 
-  // Если не залогинен в кино, проверяем паспорт по email из банка/паспорта
   let emailToCheck = localStorage.getItem('bobor_email') || localStorage.getItem('id_email');
 
-  // Если email нет - показываем окно BOBOR-ID
   if (!emailToCheck) {
     document.getElementById('check-screen').style.display = 'block';
     document.getElementById('login-screen').style.display = 'none';
@@ -132,7 +139,6 @@ function checkID() {
     return;
   }
 
-  // Проверяем статус в BOBOR-ID
   document.getElementById('check-screen').style.display = 'block';
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('check-title').innerText = '⏳ Проверка...';
@@ -143,11 +149,9 @@ function checkID() {
     .then(r => r.json())
     .then(data => {
       if (data.approved) {
-        // Если подтвержден - показываем экран входа (кино еще не авторизован)
         document.getElementById('check-screen').style.display = 'none';
         document.getElementById('login-screen').style.display = 'block';
       } else {
-        // Если не подтвержден
         document.getElementById('check-title').innerText = '⏳ ОЖИДАНИЕ';
         document.getElementById('check-title').style.color = '#FFB800';
         document.getElementById('check-text').innerText = 'Ваш BOBOR-ID не подтвержден.';
@@ -156,13 +160,12 @@ function checkID() {
       }
     })
     .catch(() => {
-      // Если сервер паспорта спит - пускаем на экран входа
       document.getElementById('check-screen').style.display = 'none';
       document.getElementById('login-screen').style.display = 'block';
     });
 }
 
-// === 2. ВХОД В КИНО ===
+// === 2. ВХОД ===
 function doLogin() {
   const email = document.getElementById('log-email').value;
   const password = document.getElementById('log-pass').value;
@@ -179,7 +182,6 @@ function doLogin() {
       currentUser = data.user;
       if (currentUser.role === 'admin') adminPass = password;
       
-      // Сохраняем сессию кино
       localStorage.setItem('bobor_cinema_user', JSON.stringify(currentUser));
       if (adminPass) localStorage.setItem('bobor_cinema_pass', adminPass);
       
@@ -191,9 +193,8 @@ function doLogin() {
   });
 }
 
-// === 3. ВЫХОД (ОЧИЩАЕТ ТОЛЬКО СЕССИЮ КИНО) ===
+// === 3. ВЫХОД (ОЧИЩАЕТ ТОЛЬКО СЕССИЮ) ===
 function logout() {
-  // Удаляем только сессию кино, НЕ ТРОГАЕМ bobor_email и id_email
   localStorage.removeItem('bobor_cinema_user');
   localStorage.removeItem('bobor_cinema_pass');
   location.reload(); 
@@ -213,7 +214,6 @@ function showMainUI() {
     <button class="btn" onclick="logout()">Выйти</button>
   `;
   
-  // ПРОВЕРКА НА АДМИНА
   if (currentUser.role === 'admin') {
     document.getElementById('admin-panel').style.display = 'block';
   }
@@ -222,7 +222,7 @@ function showMainUI() {
   loadVideos();
 }
 
-// === 4. ФУНКЦИИ ВИДЕО ===
+// === 4. ВИДЕО ===
 function loadProgress() {
   if (!currentUser || currentUser.email === 'guest') return;
   fetch('/api/progress/' + currentUser.email)
