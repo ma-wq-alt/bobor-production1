@@ -99,28 +99,36 @@ let userProgress = {};
 let currentVideoData = null;
 let saveInterval = null;
 
-// === ПРОВЕРКА ===
+// === ИСПРАВЛЕННАЯ ПРОВЕРКА (используем sessionStorage) ===
 function checkID() {
-  let savedEmail = localStorage.getItem('bobor_email') || localStorage.getItem('id_email');
+  // sessionStorage живет, пока открыта вкладка (даже при F5)
+  let savedEmail = sessionStorage.getItem('bobor_email') || localStorage.getItem('bobor_email');
   
-  // Если email нет вообще - значит это новый человек, показываем регистрацию
-  if (!savedEmail) {
+  // Если паспорт уже проверен в этой сессии - просто показываем экран ВХОДА (не регистрации)
+  if (sessionStorage.getItem('cinema_approved') === 'true') {
     document.getElementById('check-screen').style.display = 'none';
     document.getElementById('login-screen').style.display = 'block';
-    // Если это совсем новый, но он тут, значит хочет зарегаться
+    
+    // Если есть сохраненный юзер, но мы ввели "Выйти", просто покажем логин
+    let saved = sessionStorage.getItem('bobor_cinema_user') || localStorage.getItem('bobor_cinema_user');
+    if(saved) { 
+      currentUser = JSON.parse(saved); 
+      showMainUI(); 
+    }
     return;
   }
 
-  // Если у нас есть email, но нет cinema_approved, проверяем паспорт
-  if (localStorage.getItem('cinema_approved') === 'true') {
-    document.getElementById('check-screen').style.display = 'none';
-    let saved = localStorage.getItem('bobor_cinema_user');
-    if(saved) { currentUser = JSON.parse(saved); showMainUI(); }
-    else { document.getElementById('login-screen').style.display = 'block'; }
+  // Если email нет вообще - показываем регистрацию (или окно BOBOR-ID)
+  if (!savedEmail) {
+    document.getElementById('check-title').innerText = '🪪 ВХОД ЧЕРЕЗ BOBOR-ID';
+    document.getElementById('check-title').style.color = '#C6FF00';
+    document.getElementById('check-text').innerText = 'Для входа получите BOBOR-ID.';
+    document.getElementById('btn-goto-id').style.display = 'block';
+    document.getElementById('btn-retry').style.display = 'block';
     return;
   }
 
-  // Иначе показываем экран проверки
+  // Проверяем паспорт
   document.getElementById('check-screen').style.display = 'block';
   document.getElementById('login-screen').style.display = 'none';
   
@@ -128,14 +136,13 @@ function checkID() {
     .then(r => r.json())
     .then(data => {
       if (data.approved) {
-        localStorage.setItem('cinema_approved', 'true');
+        sessionStorage.setItem('cinema_approved', 'true');
         document.getElementById('check-screen').style.display = 'none';
-        // Показываем экран входа
         document.getElementById('login-screen').style.display = 'block';
       } else {
         document.getElementById('check-title').innerText = '⏳ ОЖИДАНИЕ';
         document.getElementById('check-title').style.color = '#FFB800';
-        document.getElementById('check-text').innerText = 'Ваш BOBOR-ID не подтвержден. Подождите админа.';
+        document.getElementById('check-text').innerText = 'Ваш BOBOR-ID не подтвержден.';
         document.getElementById('btn-goto-id').style.display = 'block';
         document.getElementById('btn-retry').style.display = 'block';
       }
@@ -162,9 +169,10 @@ function doLogin() {
       currentUser = data.user;
       if (currentUser.role === 'admin') adminPass = password;
       
-      localStorage.setItem('bobor_cinema_user', JSON.stringify(currentUser));
-      localStorage.setItem('bobor_email', currentUser.email); 
-      if (adminPass) localStorage.setItem('bobor_cinema_pass', adminPass);
+      // Сохраняем в sessionStorage (не удалится при F5)
+      sessionStorage.setItem('bobor_cinema_user', JSON.stringify(currentUser));
+      sessionStorage.setItem('bobor_email', currentUser.email); 
+      if (adminPass) sessionStorage.setItem('bobor_cinema_pass', adminPass);
       
       showMainUI(); 
     } else {
@@ -174,13 +182,13 @@ function doLogin() {
   });
 }
 
-// === ВЫХОД БЕЗ УДАЛЕНИЯ ПАСПОРТА ===
+// === ВЫХОД (УДАЛЯЕМ ТОЛЬКО СЕССИЮ КИНО) ===
 function logout() {
-  // Удаляем ТОЛЬКО данные текущего входа в кино
-  localStorage.removeItem('bobor_cinema_user');
-  localStorage.removeItem('bobor_cinema_pass');
-  // НЕ трогаем bobor_email и cinema_approved!
-  // Это позволит при следующем заходе не проходить проверку заново, а сразу увидеть экран входа.
+  // Удаляем только данные кино из sessionStorage
+  sessionStorage.removeItem('bobor_cinema_user');
+  sessionStorage.removeItem('bobor_cinema_pass');
+  // НЕ удаляем bobor_email и cinema_approved
+  // Но чтобы при F5 не выкидывало, мы перезагружаем страницу, и она снова покажет экран входа
   location.reload(); 
 }
 
