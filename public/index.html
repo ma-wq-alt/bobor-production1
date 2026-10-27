@@ -37,7 +37,6 @@
   .player-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   .btn-close { background: #ff5555; padding: 5px 10px; font-size: 12px; }
   
-  /* Экран проверки */
   .check-screen { text-align: center; padding: 50px 20px; }
   .check-screen h1 { font-size: 24px; margin-bottom: 10px; }
 </style>
@@ -57,7 +56,7 @@
 
   <!-- ЭКРАН ПРОВЕРКИ BOBOR-ID -->
   <div class="card check-screen" id="check-screen" style="display:none;">
-    <h1 style="color:#FFB800;" id="check-title">⏳ Проверка...</h2>
+    <h1 style="color:#FFB800;" id="check-title">⏳ Проверка...</h1>
     <p style="color:#8A8A93;" id="check-text">Проверяем ваш BOBOR-ID...</p>
     <button class="btn2" style="width:100%;margin-top:20px;display:none;" id="btn-goto-id" onclick="window.open('https://bobor-passport.onrender.com', '_blank')">Перейти в BOBOR-ID</button>
     <button class="btn" style="width:100%;margin-top:10px;display:none;" id="btn-retry" onclick="location.reload()">Проверить снова</button>
@@ -70,6 +69,7 @@
       <div class="header-right" id="header-right"></div>
     </div>
 
+    <!-- АДМИН ПАНЕЛЬ -->
     <div class="card" id="admin-panel" style="display:none; border-color:#C6FF00">
       <h3 style="color:#C6FF00;margin-top:0">Панель админа</h3>
       <div class="form-group"><label>Название</label><input type="text" id="v-title" placeholder="Например: Пилот"></div>
@@ -81,6 +81,7 @@
       <button class="btn btn-admin" onclick="addVideo()">Загрузить</button>
     </div>
 
+    <!-- ПЛЕЕР -->
     <div class="card player-box" id="player-box">
       <div class="player-header">
         <h3 id="player-title" style="margin:0"></h3>
@@ -91,6 +92,7 @@
       <div style="margin-top:10px"><a id="download-link" href="#" download><button class="btn">⬇ Скачать видео</button></a></div>
     </div>
 
+    <!-- СПИСОК ВИДЕО -->
     <div id="video-list"></div>
   </div>
 </div>
@@ -227,8 +229,7 @@ function showMainUI() {
   loadVideos();
 }
 
-// ... ОСТАЛЬНОЙ КОД (loadProgress, loadVideos, playV и т.д.) ...
-
+// === ФУНКЦИИ ВИДЕО ===
 function loadProgress() {
   if (!currentUser || currentUser.email === 'guest') return;
   fetch('/api/progress/' + currentUser.email)
