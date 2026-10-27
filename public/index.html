@@ -104,12 +104,23 @@ let userProgress = {};
 let currentVideoData = null;
 let saveInterval = null;
 
-// === 1. ПРОВЕРКА BOBOR-ID ===
+// === 1. ПРОВЕРКА BOBOR-ID ПРИ ЗАГРУЗКЕ ===
 function checkID() {
-  // Ищем email из банка или кино
+  // Проверяем, сохранен ли вход в кино
+  const savedUser = localStorage.getItem('bobor_cinema_user');
+  
+  if (savedUser) {
+    // Если сохранен - сразу пускаем в кино (автозагрузка)
+    currentUser = JSON.parse(savedUser);
+    adminPass = localStorage.getItem('bobor_cinema_pass') || '';
+    showMainUI();
+    return;
+  }
+
+  // Если не залогинен в кино, проверяем паспорт по email из банка/паспорта
   let emailToCheck = localStorage.getItem('bobor_email') || localStorage.getItem('id_email');
 
-  // Если нет email — значит новый человек, показываем окно BOBOR-ID
+  // Если email нет - показываем окно BOBOR-ID
   if (!emailToCheck) {
     document.getElementById('check-screen').style.display = 'block';
     document.getElementById('login-screen').style.display = 'none';
@@ -121,32 +132,22 @@ function checkID() {
     return;
   }
 
-  // Проверяем паспорт
+  // Проверяем статус в BOBOR-ID
   document.getElementById('check-screen').style.display = 'block';
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('check-title').innerText = '⏳ Проверка...';
   document.getElementById('check-title').style.color = '#FFB800';
   document.getElementById('check-text').innerText = 'Проверяем ваш BOBOR-ID...';
-  document.getElementById('btn-goto-id').style.display = 'none';
-  document.getElementById('btn-retry').style.display = 'none';
 
   fetch('https://bobor-passport.onrender.com/api/approval/' + emailToCheck)
     .then(r => r.json())
     .then(data => {
       if (data.approved) {
-        // Если паспорт есть, но мы уже залогинены в кино — сразу кино
-        let savedUser = localStorage.getItem('bobor_cinema_user');
-        if (savedUser) {
-          currentUser = JSON.parse(savedUser);
-          adminPass = localStorage.getItem('bobor_cinema_pass') || '';
-          showMainUI();
-        } else {
-          // Если не залогинены — экран входа
-          document.getElementById('check-screen').style.display = 'none';
-          document.getElementById('login-screen').style.display = 'block';
-        }
+        // Если подтвержден - показываем экран входа (кино еще не авторизован)
+        document.getElementById('check-screen').style.display = 'none';
+        document.getElementById('login-screen').style.display = 'block';
       } else {
-        // Если паспорт не подтвержден
+        // Если не подтвержден
         document.getElementById('check-title').innerText = '⏳ ОЖИДАНИЕ';
         document.getElementById('check-title').style.color = '#FFB800';
         document.getElementById('check-text').innerText = 'Ваш BOBOR-ID не подтвержден.';
@@ -155,7 +156,7 @@ function checkID() {
       }
     })
     .catch(() => {
-      // Если сервер BOBOR-ID спит, пускаем на экран входа
+      // Если сервер паспорта спит - пускаем на экран входа
       document.getElementById('check-screen').style.display = 'none';
       document.getElementById('login-screen').style.display = 'block';
     });
@@ -180,7 +181,6 @@ function doLogin() {
       
       // Сохраняем сессию кино
       localStorage.setItem('bobor_cinema_user', JSON.stringify(currentUser));
-      localStorage.setItem('bobor_email', currentUser.email); 
       if (adminPass) localStorage.setItem('bobor_cinema_pass', adminPass);
       
       showMainUI(); 
@@ -191,9 +191,9 @@ function doLogin() {
   });
 }
 
-// === 3. ВЫХОД ===
+// === 3. ВЫХОД (ОЧИЩАЕТ ТОЛЬКО СЕССИЮ КИНО) ===
 function logout() {
-  // Удаляем ТОЛЬКО сессию кино. Паспорт и email остаются!
+  // Удаляем только сессию кино, НЕ ТРОГАЕМ bobor_email и id_email
   localStorage.removeItem('bobor_cinema_user');
   localStorage.removeItem('bobor_cinema_pass');
   location.reload(); 
