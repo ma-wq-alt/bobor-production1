@@ -69,7 +69,7 @@
       <div class="header-right" id="header-right"></div>
     </div>
 
-    <!-- АДМИН ПАНЕЛЬ -->
+    <!-- АДМИН ПАНЕЛЬ (ВОТ ОНА) -->
     <div class="card" id="admin-panel" style="display:none; border-color:#C6FF00">
       <h3 style="color:#C6FF00;margin-top:0">Панель админа</h3>
       <div class="form-group"><label>Название</label><input type="text" id="v-title" placeholder="Например: Пилот"></div>
@@ -201,10 +201,15 @@ function checkSavedLogin() {
 }
 
 function logout() {
+  // Полная очистка памяти кинотеатра и банка
   localStorage.removeItem('bobor_cinema_user');
   localStorage.removeItem('bobor_cinema_pass');
   localStorage.removeItem('cinema_approved');
-  location.reload();
+  localStorage.removeItem('bobor_email');
+  localStorage.removeItem('bobor_secret');
+  localStorage.removeItem('bobor_approved');
+  // Перезагрузка страницы
+  window.location.href = window.location.pathname; 
 }
 
 function showMainUI() {
