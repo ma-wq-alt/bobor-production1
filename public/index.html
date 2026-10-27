@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BOBOR PRODUCTION</title>
 <style>
+  /* Все твои стили */
   body{background:#0B0B0F;color:#fff;font-family:Arial,sans-serif;margin:0;padding:20px}
   .wrap{max-width:800px;margin:0 auto}
   .card{background:#15151B;border:1px solid #26262E;border-radius:12px;padding:20px;margin-bottom:15px}
@@ -44,15 +45,13 @@
 <body>
 <div class="wrap">
   
-  <!-- 1. ЭКРАН ПРОВЕРКИ BOBOR-ID (Стартовый) -->
   <div class="card check-screen" id="check-screen">
     <h1 style="color:#FFB800;" id="check-title">⏳ Проверка...</h1>
     <p style="color:#8A8A93;" id="check-text">Проверяем ваш BOBOR-ID...</p>
     <button class="btn2" style="width:100%;margin-top:20px;display:none;" id="btn-goto-id" onclick="window.open('https://bobor-passport.onrender.com', '_blank')">Перейти в BOBOR-ID</button>
-    <button class="btn" style="width:100%;margin-top:10px;display:none;" id="btn-retry" onclick="location.reload()">Я подтвердил, проверить</button>
+    <button class="btn" style="width:100%;margin-top:10px;display:none;" id="btn-retry" onclick="location.reload()">Проверить снова</button>
   </div>
 
-  <!-- 2. ЭКРАН ЛОГИНА (появляется только после проверки) -->
   <div class="card login-box" id="login-screen" style="display:none;">
     <h2 style="text-align:center">🎬 BOBOR PRODUCTION</h2>
     <p style="text-align:center;color:#8A8A93">Вход через аккаунт банка</p>
@@ -62,7 +61,6 @@
     <button class="btn" style="width:100%" onclick="doLogin()">Войти</button>
   </div>
 
-  <!-- 3. ОСНОВНОЙ ИНТЕРФЕЙС -->
   <div id="main-ui" style="display:none">
     <div class="header">
       <h1>🎬 BOBOR PRODUCTION</h1>
@@ -101,47 +99,38 @@ let userProgress = {};
 let currentVideoData = null;
 let saveInterval = null;
 
-// === 1. ПРОВЕРКА BOBOR-ID ПРИ ЗАХОДЕ ===
+// === ПРОВЕРКА ===
 function checkID() {
-  // Если мы уже проверяли в этой сессии - сразу показываем логин
-  if (localStorage.getItem('cinema_approved') === 'true') {
+  let savedEmail = localStorage.getItem('bobor_email') || localStorage.getItem('id_email');
+  
+  // Если email нет вообще - значит это новый человек, показываем регистрацию
+  if (!savedEmail) {
     document.getElementById('check-screen').style.display = 'none';
     document.getElementById('login-screen').style.display = 'block';
-    
-    // Автовход, если уже логинились в кино
+    // Если это совсем новый, но он тут, значит хочет зарегаться
+    return;
+  }
+
+  // Если у нас есть email, но нет cinema_approved, проверяем паспорт
+  if (localStorage.getItem('cinema_approved') === 'true') {
+    document.getElementById('check-screen').style.display = 'none';
     let saved = localStorage.getItem('bobor_cinema_user');
     if(saved) { currentUser = JSON.parse(saved); showMainUI(); }
+    else { document.getElementById('login-screen').style.display = 'block'; }
     return;
   }
 
-  // Если кэша нет, показываем экран проверки
+  // Иначе показываем экран проверки
   document.getElementById('check-screen').style.display = 'block';
-  document.getElementById('check-title').innerText = '⏳ Проверка...';
-  document.getElementById('check-title').style.color = '#FFB800';
-  document.getElementById('check-text').innerText = 'Проверяем ваш BOBOR-ID...';
-  document.getElementById('btn-goto-id').style.display = 'none';
-  document.getElementById('btn-retry').style.display = 'none';
-
-  let emailToCheck = localStorage.getItem('bobor_email') || localStorage.getItem('id_email');
-
-  // Если человек вообще не авторизован в банке - отправляем получать ID
-  if (!emailToCheck) {
-    document.getElementById('check-title').innerText = '🪪 НУЖЕН BOBOR-ID';
-    document.getElementById('check-title').style.color = '#C6FF00';
-    document.getElementById('check-text').innerText = 'Чтобы смотреть кино, сначала получите BOBOR-ID.';
-    document.getElementById('btn-goto-id').style.display = 'block';
-    document.getElementById('btn-retry').style.display = 'block';
-    return;
-  }
-
-  // Стучимся в паспорт
-  fetch('https://bobor-passport.onrender.com/api/approval/' + emailToCheck)
+  document.getElementById('login-screen').style.display = 'none';
+  
+  fetch('https://bobor-passport.onrender.com/api/approval/' + savedEmail)
     .then(r => r.json())
     .then(data => {
       if (data.approved) {
         localStorage.setItem('cinema_approved', 'true');
-        // Паспорт есть! Показываем экран логина кино
         document.getElementById('check-screen').style.display = 'none';
+        // Показываем экран входа
         document.getElementById('login-screen').style.display = 'block';
       } else {
         document.getElementById('check-title').innerText = '⏳ ОЖИДАНИЕ';
@@ -152,13 +141,11 @@ function checkID() {
       }
     })
     .catch(() => {
-      // Если сервер спит - пускаем на экран логина
       document.getElementById('check-screen').style.display = 'none';
       document.getElementById('login-screen').style.display = 'block';
     });
 }
 
-// === 2. ВХОД В КИНО ===
 function doLogin() {
   const email = document.getElementById('log-email').value;
   const password = document.getElementById('log-pass').value;
@@ -187,10 +174,13 @@ function doLogin() {
   });
 }
 
+// === ВЫХОД БЕЗ УДАЛЕНИЯ ПАСПОРТА ===
 function logout() {
+  // Удаляем ТОЛЬКО данные текущего входа в кино
   localStorage.removeItem('bobor_cinema_user');
   localStorage.removeItem('bobor_cinema_pass');
-  localStorage.removeItem('cinema_approved'); // Сбрасываем подтверждение, чтобы при выходе снова проверяло
+  // НЕ трогаем bobor_email и cinema_approved!
+  // Это позволит при следующем заходе не проходить проверку заново, а сразу увидеть экран входа.
   location.reload(); 
 }
 
@@ -216,7 +206,7 @@ function showMainUI() {
   loadVideos();
 }
 
-// === 3. ФУНКЦИИ ВИДЕО (без изменений) ===
+// === ФУНКЦИИ ВИДЕО ===
 function loadProgress() {
   if (!currentUser || currentUser.email === 'guest') return;
   fetch('/api/progress/' + currentUser.email)
@@ -341,7 +331,6 @@ function closePlayer() {
   loadVideos(); 
 }
 
-// ЗАПУСКАЕМ ПРОВЕРКУ ПРИ ЗАГРУЗКЕ
 checkID();
 </script>
 </body>
