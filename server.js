@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createClient } from '@libsql/client';
-import webpush from 'web-push'; // ДОБАВЛЕНО
+import webpush from 'web-push'; // ВОТ ЭТОЙ СТРОЧКИ НЕ ХВАТАЛО!
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -13,7 +13,6 @@ const TURSO_URL = process.env.TURSO_URL;
 const TURSO_TOKEN = process.env.TURSO_TOKEN;
 const db = (TURSO_URL && TURSO_TOKEN) ? createClient({ url: TURSO_URL, authToken: TURSO_TOKEN }) : null;
 
-// ДОБАВЛЕНО: Настройка VAPID
 webpush.setVapidDetails(
   process.env.VAPID_SUBJECT || 'mailto:mar.maks999@gmail.com',
   process.env.VAPID_PUBLIC_KEY,
@@ -28,14 +27,12 @@ async function initDB() {
     await db.batch([
       `CREATE TABLE IF NOT EXISTS cinema_videos (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, season INTEGER, episode INTEGER, url TEXT)`,
       `CREATE TABLE IF NOT EXISTS watch_progress (user_email TEXT, video_id INTEGER, progress REAL, duration REAL, updated_at TEXT, PRIMARY KEY (user_email, video_id))`,
-      // ДОБАВЛЕНО: Таблица для пушей
       `CREATE TABLE IF NOT EXISTS cinema_push_subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL, endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`
     ]);
     console.log('✅ База и прогресс готовы');
   } catch (e) { console.error('Ошибка базы:', e.message); }
 }
 
-// ДОБАВЛЕНО: API для подписки на пуши
 app.post('/api/push/subscribe', async (req, res) => {
   const { email, subscription } = req.body;
   if (!db) return res.status(500).json({ error: 'Нет базы' });
@@ -52,7 +49,6 @@ app.post('/api/push/subscribe', async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'DB error' }); }
 });
 
-// ДОБАВЛЕНО: Функция отправки пуша всем
 async function sendPushToAll(title, body) {
   if (!db) return;
   try {
@@ -150,11 +146,9 @@ app.post('/api/progress', async (req, res) => {
   }
 });
 
-// ДОБАВЛЕНО: API для рассылки пуша
 app.post('/api/push/send', async (req, res) => {
   const { password, title, body } = req.body;
   if (password !== ADMIN_PASSWORD && password !== '1495') return res.status(401).json({ error: 'Нет доступа' });
-  
   await sendPushToAll(title, body);
   res.json({ success: true });
 });
